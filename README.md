@@ -40,12 +40,15 @@ In the time it takes you to read the table, you could have done them all 1000000
 
 It's up to you whether you think the performance differences are necessary.
 
+> These comparisons are based on a number of repeat tests running on my laptop in a unit test with a dozen programs open, to simulate the worst case scenario. :)
+
 |Type|Init Speed|Use Speed|Advantages|Disadvantages|
 |----|----------|---------|----------|-------------|
-|Normal Reflection|Medium - <15000ns|Medium - <10000ns|Reliable, well-known, easy to cache.|Lots of boilerplate, lots of checked exceptions to handle.|
-|Basic Mirror|Slow - <20000ns|Medium - <10000ns|Reliable, easy to cache, no checked exceptions, helper methods.|Wrapper, can be slightly slower than normal reflection to start with.|
-|Magic Mirror|Much Slower - >100000ns|Medium - <10000ns|Much easier to use, quite intuitive, auto-caching.|Always slower than normal reflection.|
-|Fast Mirror|Slow - ~25000ns|Very Fast - ~1500ns|As fast as possible using reflection.|Involves precise JVM manipulation.|
+|Direct Use|None|~300ns|(This is normal Java code.)| - |
+|Normal Reflection|< 15000ns|< 10000ns|Reliable, well-known, easy to cache.|Lots of boilerplate, lots of checked exceptions to handle.|
+|Basic Mirror|< 20000ns|< 10000ns|Reliable, easy to cache, no checked exceptions, helper methods.|Wrapper, can be slightly slower than normal reflection to start with.|
+|Magic Mirror|> 100000ns|< 10000ns|Much easier to use, quite intuitive, auto-caching.|Always slower than normal reflection.|
+|Fast Mirror|~25000ns|~1500ns|As fast as possible using reflection.|Involves precise JVM manipulation.|
 
 ## Basic Mirrors
 

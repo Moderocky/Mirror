@@ -1,10 +1,12 @@
 package mx.kenzie.mirror;
 
 import mx.kenzie.mirror.copy.Reflected;
-import mx.kenzie.mirror.error.CapturedReflectionException;
 import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.*;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.VarHandle;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 public class ClassMirror<Subject> extends Mirror<Class<Subject>> {
     
@@ -21,6 +23,7 @@ public class ClassMirror<Subject> extends Mirror<Class<Subject>> {
         throw new IllegalStateException("Cannot create magic invocation of class.");
     }
     
+    @Override
     public <ReturnType> MethodMirror<ReturnType> method(final String name, final Class<?>... parameters) {
         try {
             final Method method = object.getDeclaredMethod(name, parameters);
@@ -30,4 +33,20 @@ public class ClassMirror<Subject> extends Mirror<Class<Subject>> {
             return null;
         }
     }
+    
+    @Override
+    public VarHandle getFieldHandle(Class<?> type, String name) {
+        return Utilities.getVarHandle(name, type, object, false);
+    }
+    
+    @Override
+    public MethodHandle getMethodHandle(Class<?> returnType, String name, Class<?>... parameterTypes) {
+        return Utilities.getMethodHandle(name, returnType, effectiveClass(), false, parameterTypes);
+    }
+    
+    @Override
+    protected Class<?> effectiveClass() {
+        return object;
+    }
+    
 }

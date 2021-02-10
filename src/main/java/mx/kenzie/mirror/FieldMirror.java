@@ -2,7 +2,9 @@ package mx.kenzie.mirror;
 
 import mx.kenzie.mirror.error.CapturedReflectionException;
 
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 
 /**
  * This class on its own will very rarely be used, except as a type to hide
@@ -57,6 +59,13 @@ public sealed class FieldMirror<Type> extends AbstractAnnotatedMirror<Field> per
     
     public Type get() {
         throw new IllegalStateException("This has no default implementation - for use by child classes.");
+    }
+    
+    public VarHandle getHandle() {
+        return Utilities.getVarHandle(object.getName(),
+            object.getType(),
+            object.getDeclaringClass(),
+            Modifier.isStatic(object.getModifiers()));
     }
     
     public double getDouble(Object target) throws CapturedReflectionException {

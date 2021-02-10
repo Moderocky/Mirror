@@ -9,6 +9,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.constant.Constable;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -271,7 +276,7 @@ final class Utilities {
     }
     
     static Field findField(Class<?> owner, String name) {
-        for (Field field : owner.getDeclaredFields()) {
+        for (final Field field : owner.getDeclaredFields()) {
             if (field.getName().equals(name)) return field;
         }
         if (owner.getSuperclass() != null) {
@@ -494,6 +499,48 @@ final class Utilities {
     
     private static Class<?> internal(String name) {
         return forName("jdk.internal.reflect." + name);
+    }
+    
+    static VarHandle getVarHandle(final String name, final Class<?> type, final Class<?> owner, final boolean dynamic) {
+        try {
+            if (dynamic)
+                return lookup(owner).findVarHandle(owner, name, type);
+            else return lookup(owner).findStaticVarHandle(owner, name, type);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new CapturedReflectionException(e);
+        }
+    }
+    
+    private static Lookup lookup(Class<?> owner) {
+        try {
+            return MethodHandles.privateLookupIn(owner, MethodHandles.lookup()).in(owner);
+        } catch (IllegalAccessException e) {
+            throw new CapturedReflectionException(e);
+        }
+    }
+    
+    static MethodHandle getMethodHandle(final String name,
+                                        final Class<?> returnType,
+                                        final Class<?> owner,
+                                        final boolean dynamic,
+                                        final Class<?>... parameterTypes) {
+        try {
+            final MethodType type = MethodType.methodType(returnType, parameterTypes);
+            if (dynamic)
+                return lookup(owner).findVirtual(owner, name, type);
+            else return lookup(owner).findStatic(owner, name, type);
+        } catch (IllegalAccessException | NoSuchMethodException e) {
+            throw new CapturedReflectionException(e);
+        }
+    }
+    
+    static MethodHandle getConstructorHandle(final Class<?> owner, final Class<?>... parameterTypes) {
+        try {
+            final MethodType type = MethodType.methodType(owner, parameterTypes);
+            return lookup(owner).findConstructor(owner, type);
+        } catch (IllegalAccessException | NoSuchMethodException e) {
+            throw new CapturedReflectionException(e);
+        }
     }
     
 }

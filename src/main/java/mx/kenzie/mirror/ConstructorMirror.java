@@ -2,6 +2,7 @@ package mx.kenzie.mirror;
 
 import mx.kenzie.mirror.error.CapturedReflectionException;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
@@ -38,5 +39,9 @@ public class ConstructorMirror<ReturnType>
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             throw new CapturedReflectionException(e);
         }
+    }
+    
+    public MethodHandle getHandle() {
+        return Utilities.getConstructorHandle(object.getDeclaringClass(), object.getParameterTypes());
     }
 }

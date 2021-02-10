@@ -4,6 +4,8 @@ import mx.kenzie.mirror.copy.Reflected;
 import mx.kenzie.mirror.error.CapturedReflectionException;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,48 +32,53 @@ public class Mirror<Subject> extends AbstractMirror<Subject> {
     }
     
     public <UnknownType> FastFieldMirror<UnknownType> fastField(final String name) {
-        final Field field = Utilities.findField(object.getClass(), name);
+        final Field field = Utilities.findField(effectiveClass(), name);
         return new TargetedFastFieldMirror<>(field,
             Utilities.getNativeAccessor(field),
             object,
-            (Class<UnknownType>) object.getClass());
+            (Class<UnknownType>) effectiveClass());
+    }
+    
+    protected Class<?> effectiveClass() {
+        return object.getClass();
     }
     
     public <UnknownType> FastFieldMirror<UnknownType> fastField(final String name, final Class<UnknownType> type) {
-        final Field field = Utilities.findField(object.getClass(), name, type);
+        final Field field = Utilities.findField(effectiveClass(), name, type);
         return new TargetedFastFieldMirror<>(field, Utilities.getNativeAccessor(field), object, type);
     }
     
     public <UnknownType> TargetedFieldMirror<UnknownType> field(final String name) {
-        final Field field = Utilities.findField(object.getClass(), name);
-        return new TargetedFieldMirror<>(field, object, (Class<UnknownType>) object.getClass());
+        final Field field = Utilities.findField(effectiveClass(), name);
+        assert field != null;
+        return new TargetedFieldMirror<>(field, object, (Class<UnknownType>) effectiveClass());
     }
     
     public <UnknownType> TargetedFieldMirror<UnknownType> field(final String name, final Class<UnknownType> type) {
-        final Field field = Utilities.findField(object.getClass(), name, type);
-        return new TargetedFieldMirror<>(field, object, (Class<UnknownType>) object.getClass());
+        final Field field = Utilities.findField(effectiveClass(), name, type);
+        return new TargetedFieldMirror<>(field, object, (Class<UnknownType>) effectiveClass());
     }
     
     public <UnknownType> TargetedFieldMirror<UnknownType> fieldFrom(final String name, final Class<?> owner) {
-        assert owner.isAssignableFrom(object.getClass()); // If not, the object doesn't have that field!
+        assert owner.isAssignableFrom(effectiveClass()); // If not, the object doesn't have that field!
         final Field field = Utilities.findField(owner, name);
         return new TargetedFieldMirror<>(field, object);
     }
     
     public <UnknownType> TargetedFieldMirror<UnknownType> fieldFrom(final String name, final Class<?> owner, final Class<UnknownType> type) {
-        assert owner.isAssignableFrom(object.getClass()); // If not, the object doesn't have that field!
+        assert owner.isAssignableFrom(effectiveClass()); // If not, the object doesn't have that field!
         final Field field = Utilities.findField(owner, name, type);
         return new TargetedFieldMirror<>(field, object);
     }
     
     public <ReturnType> MethodMirror<ReturnType> methodNamed(final String name) {
-        final Method method = Utilities.findMethod(object.getClass(), name);
+        final Method method = Utilities.findMethod(effectiveClass(), name);
         return new TargetedMethodMirror<>(method, object);
     }
     
     public <ReturnType> MethodMirror<ReturnType> method(final String name, final Class<?>... parameters) {
         try {
-            final Method method = object.getClass().getDeclaredMethod(name, parameters);
+            final Method method = effectiveClass().getDeclaredMethod(name, parameters);
             return new TargetedMethodMirror<>(method, object);
         } catch (NoSuchMethodException e) {
             return null;
@@ -79,17 +86,8 @@ public class Mirror<Subject> extends AbstractMirror<Subject> {
     }
     
     public <ReturnType> FastMethodMirror<ReturnType> fastMethodNamed(final String name) {
-        final Method method = Utilities.findMethod(object.getClass(), name);
+        final Method method = Utilities.findMethod(effectiveClass(), name);
         return new TargetedFastMethodMirror<>(method, Utilities.getNativeAccessor(method), object);
-    }
-    
-    public <ReturnType> FastMethodMirror<ReturnType> fastMethod(final String name, final Class<?>... parameters) {
-        try {
-            final Method method = object.getClass().getDeclaredMethod(name, parameters);
-            return new TargetedFastMethodMirror<>(method, Utilities.getNativeAccessor(method), object);
-        } catch (NoSuchMethodException e) {
-            return null;
-        }
     }
     
     @SuppressWarnings("unchecked")
@@ -106,16 +104,13 @@ public class Mirror<Subject> extends AbstractMirror<Subject> {
         }
     }
     
-    /**
-     * Creates a new instance of the object parallel to this one.
-     * This will succeed by any means - even if it has to allocate a new instance in memory.
-     * @param parameters the parameters for construction
-     * @return
-     */
-    @SuppressWarnings("unchecked")
-    public Subject newParallelInstance(Object... parameters) {
-        return new ClassMirror<>((Class<Subject>) type)
-            .newInstance(parameters);
+    public <ReturnType> FastMethodMirror<ReturnType> fastMethod(final String name, final Class<?>... parameters) {
+        try {
+            final Method method = effectiveClass().getDeclaredMethod(name, parameters);
+            return new TargetedFastMethodMirror<>(method, Utilities.getNativeAccessor(method), object);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
     }
     
     public Subject shallowCopy() {
@@ -128,6 +123,35 @@ public class Mirror<Subject> extends AbstractMirror<Subject> {
         final Subject copy = Utilities.allocateInstance((Class<Subject>) object.getClass());
         Utilities.deepCopy(object, copy);
         return copy;
+    }
+    
+    /**
+     * Creates a new instance of the object parallel to this one.
+     * This will succeed by any means - even if it has to allocate a new instance in memory.
+     *
+     * @param parameters the parameters for construction
+     * @return a new instance
+     */
+    @SuppressWarnings("unchecked")
+    public Subject newParallelInstance(Object... parameters) {
+        return new ClassMirror<>((Class<Subject>) type)
+            .newInstance(parameters);
+    }
+    
+    public VarHandle getFieldHandle(Class<?> type, String name, boolean dynamic) {
+        return Utilities.getVarHandle(name, type, effectiveClass(), dynamic);
+    }
+    
+    public VarHandle getFieldHandle(Class<?> type, String name) {
+        return Utilities.getVarHandle(name, type, effectiveClass(), true);
+    }
+    
+    public MethodHandle getMethodHandle(Class<?> returnType, String name, boolean dynamic, Class<?>... parameterTypes) {
+        return Utilities.getMethodHandle(name, returnType, effectiveClass(), dynamic, parameterTypes);
+    }
+    
+    public MethodHandle getMethodHandle(Class<?> returnType, String name, Class<?>... parameterTypes) {
+        return Utilities.getMethodHandle(name, returnType, effectiveClass(), true, parameterTypes);
     }
     
 }

@@ -4,6 +4,7 @@ import mx.kenzie.mirror.copy.Reflected;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
+import java.lang.constant.Constable;
 import java.lang.reflect.AnnotatedElement;
 
 /**
@@ -50,5 +51,6 @@ public abstract class AbstractAnnotatedMirror<Subject extends AnnotatedElement>
         return cls;
     }
     
+    public abstract Constable getHandle();
     
 }

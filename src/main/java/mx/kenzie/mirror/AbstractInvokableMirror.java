@@ -1,5 +1,6 @@
 package mx.kenzie.mirror;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Executable;
 
 /**
@@ -29,5 +30,7 @@ public abstract class AbstractInvokableMirror<ReturnType, Subject extends Execut
     public ReturnType invoke(Object... parameters) {
         throw new IllegalStateException("This has no default implementation - for use by child classes.");
     }
+    
+    public abstract MethodHandle getHandle();
     
 }

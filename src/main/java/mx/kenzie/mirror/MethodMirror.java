@@ -2,8 +2,10 @@ package mx.kenzie.mirror;
 
 import mx.kenzie.mirror.error.CapturedReflectionException;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 public sealed class MethodMirror<ReturnType> extends AbstractInvokableMirror<ReturnType, Method> permits FastMethodMirror, TargetedMethodMirror {
     
@@ -46,6 +48,14 @@ public sealed class MethodMirror<ReturnType> extends AbstractInvokableMirror<Ret
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new CapturedReflectionException(e);
         }
+    }
+    
+    public MethodHandle getHandle() {
+        return Utilities.getMethodHandle(object.getName(),
+            object.getReturnType(),
+            object.getDeclaringClass(),
+            Modifier.isStatic(object.getModifiers()),
+            object.getParameterTypes());
     }
     
 }

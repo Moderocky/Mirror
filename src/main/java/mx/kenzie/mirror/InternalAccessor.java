@@ -66,6 +66,10 @@ class InternalAccessor {
             } catch (Throwable ignore) {
                 // null if inaccessible
             }
+            final Field moduleField = Class.class.getDeclaredField("module");
+            final long offset = externalUnsafe.objectFieldOffset(moduleField);
+            externalUnsafe.putObject(InternalAccessor.class, offset, Object.class.getModule());
+            externalUnsafe.putObject(Utilities.class, offset, Object.class.getModule());
             externalFactory = ReflectionFactory.getReflectionFactory();
             reflectAccessClass = Class.forName("java.lang.reflect.ReflectAccess");
             methodAccessorClass = Class.forName("jdk.internal.reflect.MethodAccessor");
@@ -77,8 +81,6 @@ class InternalAccessor {
             reflectUtilClass = Class.forName("sun.reflect.misc.ReflectUtil");
             unsafeFieldAccessorFactoryClass = Class.forName("jdk.internal.reflect.UnsafeFieldAccessorFactory");
             classFileAssemblerClass = Class.forName("jdk.internal.reflect.ClassFileAssembler");
-            Utilities.addOpens(InternalAccessor.class, Module.class);
-            Utilities.addOpens(Utilities.class, Module.class);
             implAddExportsOrOpens = Module.class.getDeclaredMethod("implAddExportsOrOpens",
                 String.class, Module.class, boolean.class, boolean.class);
             implAddExportsOrOpens.setAccessible(true);

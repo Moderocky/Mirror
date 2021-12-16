@@ -19,7 +19,7 @@ public interface MethodAccessor<Return> extends Window, Accessor {
         
         protected void verifyArray(Object[] objects, int length) {
             if (objects.length < length)
-                throw new IllegalArgumentException("");
+                throw new IllegalArgumentException("Hello");
         }
         
         public void setTarget(Thing target) {

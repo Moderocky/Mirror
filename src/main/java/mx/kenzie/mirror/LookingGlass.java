@@ -16,7 +16,10 @@ import java.util.Objects;
 
 import static org.objectweb.asm.Opcodes.*;
 
-final class LookingGlass extends Glass {
+@SuppressWarnings({"unchecked", "Duplicates", "UnusedLabel", "TypeParameterHidesVisibleType"})
+class LookingGlass extends Glass implements ClassProvider {
+    
+    ClassProvider provider;
     
     //region Constructor Accessor Generation
     <Thing>
@@ -29,7 +32,7 @@ final class LookingGlass extends Glass {
         else {
             final String location = "mx/kenzie/mirror/generated/Method_" + hash;
             final byte[] bytecode = this.writeConstructorAccessor(target, constructor, location);
-            type = this.loadClass("mx.kenzie.mirror.generated.Method_" + hash, bytecode);
+            type = this.loadClass(target, "mx.kenzie.mirror.generated.Method_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
         }
         final ConstructorAccessor.ConstructorAccessorImpl<Thing> accessor = this.make(type, target);
@@ -103,13 +106,13 @@ final class LookingGlass extends Glass {
         if (method == null) throw new NullPointerException("No matching method was found.");
         final String hash = "" + method.getDeclaringClass().hashCode() + "_" + method.getName()
             .hashCode() + Objects.hash((Object[]) method.getParameterTypes());
-        final Class<?> point = target.getClass();
+        final Class<?> point = target instanceof Class c ? c : target.getClass();
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
         else {
             final String location = "mx/kenzie/mirror/generated/Method_" + hash;
             final byte[] bytecode = this.writeMethodAccessor(point, method, location);
-            type = this.loadClass("mx.kenzie.mirror.generated.Method_" + hash, bytecode);
+            type = this.loadClass(LookingGlass.class, "mx.kenzie.mirror.generated.Method_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
         }
         final MethodAccessor.MethodAccessorImpl<Thing, Return> accessor = this.make(type, target);
@@ -133,43 +136,46 @@ final class LookingGlass extends Glass {
             visitor.visitMaxs(2, 2);
             visitor.visitEnd();
         }
-        invoker:
-        {
-            final MethodVisitor visitor;
-            final Type methodType = Type.getMethodType(Type.getType(Object.class), Type.getType(Object[].class));
-            final Class<?>[] parameters = method.getParameterTypes();
-            visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC, "invoke", methodType.getDescriptor(), null, null);
-            visitor.visitCode();
-            if (!Modifier.isStatic(method.getModifiers())) {
-                visitor.visitVarInsn(ALOAD, 0);
-                visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
-                visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType)); // CC is okay here, always right
-            }
+        this.writeInvoker(writer, method, location, targetType);
+        return writer.toByteArray();
+    }
+    
+    protected void writeInvoker(ClassWriter writer, Method method, String location, Class<?> targetType) {
+        final MethodVisitor visitor;
+        final Type methodType = Type.getMethodType(Type.getType(Object.class), Type.getType(Object[].class));
+        final Class<?>[] parameters = method.getParameterTypes();
+        visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC, "invoke", methodType.getDescriptor(), null, null);
+        visitor.visitCode();
+        if (!Modifier.isStatic(method.getModifiers())) {
+            visitor.visitVarInsn(ALOAD, 0);
+            visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
+            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType)); // CC is okay here, always right
+        }
+        if (verify()) {
             visitor.visitVarInsn(ALOAD, 0);
             visitor.visitVarInsn(ALOAD, 1);
             visitor.visitIntInsn(BIPUSH, parameters.length);
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(MethodAccessor.MethodAccessorImpl.class), "verifyArray", "([Ljava/lang/Object;I)V", false);
-            parameters:
-            {
-                if (parameters.length == 0) break parameters;
-                for (int i = 0; i < parameters.length; i++) {
-                    this.convertParameter(visitor, parameters[i], i);
-                }
-            }
-            if (this.isReachable(method)) this.invokeNormal(visitor, method);
-            else this.invokeDynamic(visitor, method);
-            if (method.getReturnType().isPrimitive())
-                this.box(visitor, method.getReturnType());
-            visitor.visitInsn(ARETURN);
-            final int offset = this.wideIndexOffset(method.getParameterTypes(), method.getReturnType());
-            final int size = Math.max(1 + parameters.length + offset, 4);
-            visitor.visitMaxs(size, size);
-            visitor.visitEnd();
         }
-        return writer.toByteArray();
+        parameters:
+        {
+            if (parameters.length == 0) break parameters;
+            for (int i = 0; i < parameters.length; i++) {
+                this.convertParameter(visitor, parameters[i], i);
+            }
+        }
+        if (this.isReachable(method)) this.invokeNormal(visitor, method);
+        else this.invokeDynamic(visitor, method);
+        if (method.getReturnType().isPrimitive())
+            this.box(visitor, method.getReturnType());
+        visitor.visitInsn(ARETURN);
+        final int offset = this.wideIndexOffset(method.getParameterTypes(), method.getReturnType());
+        final int size = Math.max(1 + parameters.length + offset, 4);
+        visitor.visitMaxs(size, size);
+        visitor.visitEnd();
     }
     
-    private void convertParameter(MethodVisitor visitor, Class<?> parameter, int index) {
+    void convertParameter(MethodVisitor visitor, Class<?> parameter, int index) {
         visitor.visitVarInsn(ALOAD, 1);
         visitor.visitIntInsn(BIPUSH, index);
         visitor.visitInsn(AALOAD);
@@ -178,7 +184,7 @@ final class LookingGlass extends Glass {
             unbox(visitor, parameter);
     }
     
-    private void invokeNormal(MethodVisitor visitor, Method method) {
+    void invokeNormal(MethodVisitor visitor, Method method) {
         if (Modifier.isInterface(method.getDeclaringClass().getModifiers())) {
             visitor.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), true);
         } else if (Modifier.isStatic(method.getModifiers())) {
@@ -201,7 +207,7 @@ final class LookingGlass extends Glass {
         visitor.visitInvokeDynamicInsn("constructor", Type.getMethodDescriptor(Type.getType(constructor.getDeclaringClass()), adjusted.toArray(new Type[0])), bootstrap, Type.getType(constructor.getDeclaringClass()));
     }
     
-    private void invokeDynamic(MethodVisitor visitor, Method method) {
+    void invokeDynamic(MethodVisitor visitor, Method method) {
         final Handle bootstrap = Handles.getBootstrap(method);
         if (!Modifier.isStatic(method.getModifiers())) {
             final List<Type> adjusted = new ArrayList<>();
@@ -238,10 +244,10 @@ final class LookingGlass extends Glass {
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
         else {
-            final Class<?> point = target.getClass();
+            final Class<?> point = target instanceof Class c ? c : target.getClass();
             final String location = "mx/kenzie/mirror/generated/Field_" + hash;
             final byte[] bytecode = this.writeFieldAccessor(point, field, location);
-            type = this.loadClass("mx.kenzie.mirror.generated.Field_" + hash, bytecode);
+            type = this.loadClass(point, "mx.kenzie.mirror.generated.Field_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
         }
         final FieldAccessor.FieldAccessorImpl<Thing, Type> accessor = this.make(type, target);
@@ -362,6 +368,13 @@ final class LookingGlass extends Glass {
         }
     }
     
+    <Template, Thing> Template makeProxy(Mirror<Thing> mirror, Class<Template> template) {
+        final ClassLoader loader;
+        if (template.getClassLoader() == null) loader = this.loader;
+        else loader = template.getClassLoader();
+        return (Template) Proxy.newProxyInstance(loader, new Class[]{template}, new ProxyAccessor<>(mirror));
+    }
+    
     boolean isReachable(Object thing) {
         if (thing instanceof Class<?> object) return Modifier.isPublic(object.getModifiers());
         else if (thing instanceof Method object)
@@ -371,6 +384,25 @@ final class LookingGlass extends Glass {
         else if (thing instanceof Constructor object)
             return Modifier.isPublic(object.getModifiers()) && this.isReachable(object.getDeclaringClass());
         else return this.isReachable(thing.getClass());
+    }
+    
+    boolean verify() {
+        return true;
+    }
+    
+    ClassProvider getProvider() {
+        return this;
+    }
+    
+    @Override
+    public Class<?> loadClass(Class<?> target, String name, byte[] bytes) {
+        if (getProvider() == this) return super.loadClass(name, bytes);
+        else return getProvider().loadClass(target, name, bytes);
+    }
+    
+    @Override
+    protected Class<?> loadClass(String name, byte[] bytes) {
+        return this.loadClass(LookingGlass.class, name, bytes);
     }
     
     //region Boxing
@@ -403,7 +435,7 @@ final class LookingGlass extends Glass {
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(Boolean.class), "booleanValue", "()Z", false);
     }
     
-    private void box(MethodVisitor visitor, Class<?> value) {
+    void box(MethodVisitor visitor, Class<?> value) {
         if (value == byte.class)
             visitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Byte.class), "valueOf", "(B)Ljava/lang/Byte;", false);
         if (value == short.class)
@@ -477,6 +509,10 @@ final class LookingGlass extends Glass {
             else if (Modifier.isPrivate(method.getModifiers())) code = H_INVOKESPECIAL;
             else code = H_INVOKEVIRTUAL;
             return new Handle(code, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), code == H_INVOKEINTERFACE);
+        }
+        
+        static Handle createHandle(String owner, String name, String descriptor) {
+            return new Handle(H_INVOKESTATIC, owner, name, descriptor, false);
         }
         
     }

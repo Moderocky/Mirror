@@ -47,18 +47,51 @@ Mirror avoids this by writing a normal invocation call where possible, meaning t
 
 The timings below are based on running the speed check in `BasicTest` on my laptop.
 
-| Type                 | Average Speed |
+| Access Type          | Average Speed |
 |----------------------|---------------|
 | Normal Invocation    | ~4ns          |
 | Access Public Member | ~6ns          |
 | Access Hidden Member | ~50ns         |
 | Reflection           | ~200ns        |
+| Proxy Invocation     | ~1100ns       |
 
 ## Migrating from v4.0.0
 
 Version 5 removes all alternative mirror types, and in return provides a much safer implementation of v4's 'fast mirror'.
 
 An object or class is first targeted with `Mirror.of(thing)`, from which special 'accessors' can be created to use particular fields, methods and constructors.
+
+## Magic Mirrors
+
+Magic mirrors are a feature borrowed from Mirror v4, allowing the smart binding of user-defined interface methods to hidden methods. These are slower than normal method accessors, as they use Java's proxy system internally (which has a lot of needless boilerplate.)
+
+In the future these will be changed to use [Glass](https://github.com/Moderocky/Glass) for a faster, more adaptive proxy creation system.
+
+```java 
+interface Test {
+    int thing(int i); // mapped to a thing(I)I method on the target object
+}
+final Test test = Mirror.of(object)
+    .magic(Test.class);
+assert test.thing(3) == 5;
+```
+
+## Accessing Named Modules
+
+Java 17+ has tried to make it impossible to access private members in named modules (such as `jdk.internal` resources.)
+As some libraries depend on these, Mirror v5 has a way of accessing them. This is a particularly **dangerous** method, so it is advised not to be used unless absolutely necessary.
+
+Calling the `unsafe` method on a mirror will replace the code-writer with one capable of using the native bootstrap classloader, which is traditionally inaccessible.
+
+```java 
+final MethodAccessor<Class<?>[]> accessor = Mirror.of(Class.class)
+    .unsafe()
+    .method("getInterfaces0");
+final Class<?>[] interfaces = accessor.invoke();
+assert interfaces[0] == Serializable.class;
+```
+
+Using this unsafe behaviour is not recommended, but may be necessary for applications that previously depended on reflection to access secret JDK internals.
 
 ## Examples
 
@@ -111,4 +144,16 @@ Using a constructor mirror:
 Mirror.of(ConstructorAccessorTest.TestConstructor.class)
     .constructor(int.class, int.class)
     .newInstance(0, 0);
+```
+
+Creating and using a simple magic mirror:
+```java 
+interface MyTemplate {
+    void myMethod(int i, int j);
+    void myMethod(int i);
+}
+final MyTemplate template = Mirror.of(object)
+    .magic(MyTemplate.class);
+template.myMethod(6, 6);
+template.myMethod(3);
 ```

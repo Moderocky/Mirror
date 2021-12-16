@@ -5,17 +5,14 @@ import mx.kenzie.mirror.Mirror;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-
 public class ConstructorAccessorTest {
     
     public static class TestConstructor {
-    
+        
         public TestConstructor(int a, int b) {
         
         }
-    
+        
         private TestConstructor(int a, String b) {
         
         }
@@ -31,7 +28,8 @@ public class ConstructorAccessorTest {
     
     @Test
     public void dynamic() {
-        final ConstructorAccessor<?> constructor = Mirror.of(TestConstructor.class).constructor(int.class, String.class);
+        final ConstructorAccessor<?> constructor = Mirror.of(TestConstructor.class)
+            .constructor(int.class, String.class);
         final Object object = constructor.newInstance(1, "hi");
         assert object instanceof TestConstructor;
     }

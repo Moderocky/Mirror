@@ -8,19 +8,19 @@ import org.junit.Test;
 public class MethodAccessorTest {
     
     private static int foo(int i) {
-        return i+1;
+        return i + 1;
     }
     
     private int bar(int i) {
-        return i+2;
+        return i + 2;
     }
     
     public static int foo(int i, int j) {
-        return i+j;
+        return i + j;
     }
     
     public int bar(int i, int j) {
-        return i+j;
+        return i + j;
     }
     
     @BeforeClass

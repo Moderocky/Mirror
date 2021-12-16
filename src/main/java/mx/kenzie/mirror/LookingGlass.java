@@ -19,8 +19,6 @@ import static org.objectweb.asm.Opcodes.*;
 @SuppressWarnings({"unchecked", "Duplicates", "UnusedLabel", "TypeParameterHidesVisibleType"})
 class LookingGlass extends Glass implements ClassProvider {
     
-    ClassProvider provider;
-    
     //region Constructor Accessor Generation
     <Thing>
     ConstructorAccessor<Thing> createAccessor(Class<?> target, Constructor<?> constructor) {
@@ -359,6 +357,7 @@ class LookingGlass extends Glass implements ClassProvider {
     }
     //endregion
     
+    //region Creators
     <Template> Template make(Class<?> type, Object target) {
         try {
             final Constructor<Template> constructor = (Constructor<Template>) type.getConstructor(Object.class);
@@ -374,7 +373,9 @@ class LookingGlass extends Glass implements ClassProvider {
         else loader = template.getClassLoader();
         return (Template) Proxy.newProxyInstance(loader, new Class[]{template}, new ProxyAccessor<>(mirror));
     }
+    //endregion
     
+    //region Boilerplate
     boolean isReachable(Object thing) {
         if (thing instanceof Class<?> object) return Modifier.isPublic(object.getModifiers());
         else if (thing instanceof Method object)
@@ -393,7 +394,9 @@ class LookingGlass extends Glass implements ClassProvider {
     ClassProvider getProvider() {
         return this;
     }
+    //endregion
     
+    //region Class Loaders
     @Override
     public Class<?> loadClass(Class<?> target, String name, byte[] bytes) {
         if (getProvider() == this) return super.loadClass(name, bytes);
@@ -404,6 +407,7 @@ class LookingGlass extends Glass implements ClassProvider {
     protected Class<?> loadClass(String name, byte[] bytes) {
         return this.loadClass(LookingGlass.class, name, bytes);
     }
+    //endregion
     
     //region Boxing
     private Class<?> getWrapperType(Class<?> primitive) {

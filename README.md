@@ -51,9 +51,9 @@ The timings below are based on running the speed check in `BasicTest` on my lapt
 |----------------------|---------------|
 | Normal Invocation    | ~4ns          |
 | Access Public Member | ~6ns          |
-| Access Hidden Member | ~50ns         |
+| Access Hidden Member | ~40ns         |
 | Reflection           | ~200ns        |
-| Proxy Invocation     | ~1100ns       |
+| Proxy Invocation     | ~1200ns       |
 
 ## Migrating from v4.0.0
 

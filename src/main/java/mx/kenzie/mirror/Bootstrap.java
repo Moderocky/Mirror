@@ -28,18 +28,6 @@ public final class Bootstrap {
         return new ConstantCallSite(handle);
     }
     
-    public static CallSite bootstrapStaticFieldSetter(MethodHandles.Lookup caller, String name, MethodType type, Class<?> owner) throws Exception {
-        final MethodHandle handle = caller.findStaticVarHandle(owner, name, type.parameterType(0))
-            .toMethodHandle(VarHandle.AccessMode.SET);
-        return new ConstantCallSite(handle);
-    }
-    
-    public static CallSite bootstrapStaticFieldGetter(MethodHandles.Lookup caller, String name, MethodType type, Class<?> owner) throws Exception {
-        final MethodHandle handle = caller.findStaticVarHandle(owner, name, type.returnType())
-            .toMethodHandle(VarHandle.AccessMode.GET);
-        return new ConstantCallSite(handle);
-    }
-    
     public static CallSite bootstrapPrivateStaticFieldSetter(MethodHandles.Lookup caller, String name, MethodType type, Class<?> owner)
         throws Exception {
         final MethodHandle handle = MethodHandles.privateLookupIn(owner, caller)

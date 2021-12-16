@@ -26,9 +26,8 @@ public interface ConstructorAccessor<Type> extends Window, Accessor, MethodAcces
                 throw new IllegalArgumentException("");
         }
         
-        public void setTarget(Type target) {
-            if (!targetType.isAssignableFrom(target.getClass()))
-                throw new IllegalArgumentException("New target must be of a compatible type.");
+        @Override
+        public void setTarget(Object target) {
             this.target = target;
         }
         

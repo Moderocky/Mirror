@@ -24,7 +24,8 @@ public interface FieldAccessor<Type> extends Window, Accessor {
             super(target);
         }
         
-        public void setTarget(Thing target) {
+        @Override
+        public void setTarget(Object target) {
             if (!targetType.isAssignableFrom(target.getClass()))
                 throw new IllegalArgumentException("New target must be of a compatible type.");
             this.target = target;

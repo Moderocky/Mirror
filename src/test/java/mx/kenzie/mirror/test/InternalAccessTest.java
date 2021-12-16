@@ -23,7 +23,7 @@ public class InternalAccessTest {
     }
     
     @Test
-    public void accessPrivateField() throws Throwable {
+    public void accessPrivateField() {
         {
             final MethodAccessor<Class<?>[]> accessor = Mirror.of(Class.class)
                 .unsafe()
@@ -40,6 +40,14 @@ public class InternalAccessTest {
             assert interfaces[0] == Serializable.class;
         }
         
+    }
+    
+    @Test
+    public void accessUnnamed() {
+        final MethodAccessor<Integer> accessor = Mirror.of(this)
+            .unsafe()
+            .method("number");
+        assert accessor.invoke() == 2;
     }
     
 }

@@ -22,6 +22,17 @@ public class Mirror<Thing> {
     }
     
     /**
+     * Mirror a class for accessing static members.
+     *
+     * @param type     the class to mirror
+     * @param <Target> the class-type
+     * @return the mirror
+     */
+    public static <Target> Mirror<Class<Target>> of(Class<Target> type) {
+        return new Mirror<>(type);
+    }
+    
+    /**
      * Creates a 'magic' mirror that follows the methods of the provided interface.
      *
      * @param template   the template interface to use
@@ -31,17 +42,6 @@ public class Mirror<Thing> {
     public <Template> Template magic(Class<Template> template) {
         if (!template.isInterface()) throw new IllegalArgumentException("Template must be an interface.");
         return glass.makeProxy(Mirror.of(target), template);
-    }
-    
-    /**
-     * Mirror a class for accessing static members.
-     *
-     * @param type     the class to mirror
-     * @param <Target> the class-type
-     * @return the mirror
-     */
-    public static <Target> Mirror<Class<Target>> of(Class<Target> type) {
-        return new Mirror<>(type);
     }
     
     /**

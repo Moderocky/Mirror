@@ -8,4 +8,6 @@ public interface Accessor {
     
     boolean isDynamicAccess();
     
+    void setTarget(Object object);
+    
 }

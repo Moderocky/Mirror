@@ -16,6 +16,7 @@ import java.util.Objects;
 
 import static org.objectweb.asm.Opcodes.*;
 
+@SuppressWarnings({"unchecked", "Duplicates", "UnusedLabel"})
 final class DarkGlass extends LookingGlass {
     
     final InternalAccessProvider provider;
@@ -24,10 +25,11 @@ final class DarkGlass extends LookingGlass {
         try {
             provider = new InternalAccessProvider();
         } catch (ClassNotFoundException | PrivilegedActionException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Unable to access JDK internals:", e);
         }
     }
     
+    //region Method Accessors
     @Override
     <Thing, Return> MethodAccessor<Return> createAccessor(Thing target, Method method) {
         final Object dark = this.createDarkAccessor(target, method);
@@ -48,18 +50,6 @@ final class DarkGlass extends LookingGlass {
             type = provider.loadClass(point, path + ".Method_" + hash, bytecode);
         }
         return this.make(type, target);
-    }
-    
-    private String getExportedPackageFrom(Class<?> place) {
-        final Module module = place.getModule();
-        final Module here = LookingGlass.class.getModule();
-        if (module.isExported(place.getPackageName()) || module.isExported(place.getPackageName(), here))
-            return place.getPackageName();
-        for (String location : module.getDescriptor().packages()) {
-            if (module.isExported(location) || module.isExported(location, here)) return location;
-        }
-        provider.export(module, place.getPackageName());
-        return place.getPackageName();
     }
     
     @Override
@@ -141,8 +131,9 @@ final class DarkGlass extends LookingGlass {
     }
     
     void writeBootstrapper(ClassWriter writer, Method method) {
+        final MethodVisitor visitor;
         if (Modifier.isStatic(method.getModifiers())) {
-            final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivate", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+            visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivate", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
             visitor.visitCode();
             visitor.visitVarInsn(ALOAD, 3);
             visitor.visitVarInsn(ALOAD, 0);
@@ -158,9 +149,8 @@ final class DarkGlass extends LookingGlass {
             visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
             visitor.visitInsn(ARETURN);
             visitor.visitMaxs(4, 5);
-            visitor.visitEnd();
         } else {
-            final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivateDynamic", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+            visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivateDynamic", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
             visitor.visitCode();
             visitor.visitVarInsn(ALOAD, 2);
             visitor.visitInsn(ICONST_0);
@@ -181,8 +171,8 @@ final class DarkGlass extends LookingGlass {
             visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
             visitor.visitInsn(ARETURN);
             visitor.visitMaxs(4, 6);
-            visitor.visitEnd();
         }
+        visitor.visitEnd();
     }
     
     void invokeDynamic(MethodVisitor visitor, Method method, String owner) {
@@ -209,6 +199,19 @@ final class DarkGlass extends LookingGlass {
         } catch (NoSuchMethodException e) {
             throw new IllegalArgumentException("Provided object is not a dark invoker.", e);
         }
+    }
+    //endregion
+    
+    private String getExportedPackageFrom(Class<?> place) {
+        final Module module = place.getModule();
+        final Module here = LookingGlass.class.getModule();
+        if (module.isExported(place.getPackageName()) || module.isExported(place.getPackageName(), here))
+            return place.getPackageName();
+        for (String location : module.getDescriptor().packages()) {
+            if (module.isExported(location) || module.isExported(location, here)) return location;
+        }
+        provider.export(module, place.getPackageName());
+        return place.getPackageName();
     }
     
     @Override

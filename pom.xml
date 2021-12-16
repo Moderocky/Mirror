@@ -7,7 +7,7 @@
     <groupId>mx.kenzie</groupId>
     <artifactId>mirror</artifactId>
     <version>5.0.0</version>
-    <name>MagicMirror</name>
+    <name>Mirror</name>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

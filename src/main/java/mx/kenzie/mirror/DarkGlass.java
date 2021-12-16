@@ -142,7 +142,7 @@ final class DarkGlass extends LookingGlass {
     
     void writeBootstrapper(ClassWriter writer, Method method) {
         if (Modifier.isStatic(method.getModifiers())) {
-            final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivate", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class<*>;)Ljava/lang/invoke/CallSite;", new String[]{"java/lang/Exception"});
+            final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivate", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
             visitor.visitCode();
             visitor.visitVarInsn(ALOAD, 3);
             visitor.visitVarInsn(ALOAD, 0);
@@ -160,7 +160,7 @@ final class DarkGlass extends LookingGlass {
             visitor.visitMaxs(4, 5);
             visitor.visitEnd();
         } else {
-            final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivateDynamic", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class<*>;)Ljava/lang/invoke/CallSite;", new String[]{"java/lang/Exception"});
+            final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapPrivateDynamic", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
             visitor.visitCode();
             visitor.visitVarInsn(ALOAD, 2);
             visitor.visitInsn(ICONST_0);

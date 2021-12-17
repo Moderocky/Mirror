@@ -87,6 +87,29 @@ final Test test = Mirror.of(object)
 assert test.thing(3) == 5;
 ```
 
+## Intrinsic Magic Mirrors
+
+Intrinsic magic mirrors are the fastest possible way to repetitively call a member, consistently outperforming everything other than directly accessing the member itself.
+
+This speed is achieved by removing as much as possible from the call, making it an almost-direct invocation of the object itself. The overhead for accessing a non-private member is under five nanoseconds, requiring only an `xload` bytecode instruction and a method call. 
+The target handle is baked directly into the method implementation, removing the need to retrieve an accessor by index and call it.
+
+As a result these have a lot less security and will throw critical errors if parameters or other type information is incorrect. As they use a provided class erasure, they cannot be calculated dynamically like MethodAccessors can, so they will not be suitable in cases where target erasure is unknown at compile-time. Boxing and type conversion is also unsupported.
+
+Intrinsic magic mirrors also support field access through the `$` prefix before a method name.
+
+```java 
+interface Magic {
+    int $number(); // retrieves the 'number' field - static or dynamic
+    
+    void $number(int i); // sets the 'number' field - static or dynamic
+}
+
+final Magic magic = Mirror.of(object).magicIntrinsic(Magic.class);
+magic.$number(5);
+assert magic.$number() == 5;
+```
+
 ## Accessing Named Modules
 
 Java 17+ has tried to make it impossible to access private members in named modules (such as `jdk.internal` resources.)
@@ -174,4 +197,19 @@ final MyTemplate template = Mirror.of(object)
     .magic(MyTemplate.class);
 template.myMethod(6, 6);
 template.myMethod(3);
+```
+
+Creating an advanced intrinsic magic mirror:
+```java 
+interface Magic {
+    int $number(); // retrieves the 'number' field
+    void $number(int i); // sets the 'number' field
+    
+    String getName();  // invokes the 'getName' method on the target
+}
+
+final Magic magic = Mirror.of(object).magicIntrinsic(Magic.class);
+magic.$number(5);
+assert magic.$number() == 5;
+assert magic.getName().equals("Henry");
 ```

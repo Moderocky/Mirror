@@ -1,5 +1,7 @@
 package mx.kenzie.mirror;
 
+import org.jetbrains.annotations.TestOnly;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -45,6 +47,21 @@ public class Mirror<Thing> {
         if (Modifier.isFinal(template.getModifiers()))
             throw new IllegalArgumentException("Template must not be final.");
         return glass.makeInlineProxy(Mirror.of(target), template);
+    }
+    
+    /**
+     * Creates an intrinsic 'magic' mirror that follows the methods of the provided class.
+     * Using an interface here is recommended, but allows any class type.
+     * This will invoke the methods on the target object directly rather than using an accessor.
+     *
+     * @param template   the template class to use
+     * @param <Template> the template type
+     * @return the populated template
+     */
+    public <Template> Template magicIntrinsic(Class<Template> template) {
+        if (Modifier.isFinal(template.getModifiers()))
+            throw new IllegalArgumentException("Template must not be final.");
+        return glass.makeIntrinsicProxy(Mirror.of(target), template);
     }
     
     /**
@@ -134,6 +151,37 @@ public class Mirror<Thing> {
     public Mirror<Thing> unsafe() {
         this.glass = new DarkGlass();
         return this;
+    }
+    
+    Field findField(String name) {
+        if (target instanceof Class<?> type)
+            return glass.findField(type, name);
+        return glass.findField(target.getClass(), name);
+    }
+    
+    Method findMethod(String name, Class<?>... parameters) {
+        if (target instanceof Class<?> type)
+            return glass.findMethod(type, name, parameters);
+        return glass.findMethod(target.getClass(), name, parameters);
+    }
+    
+    Class<?> emergentClass() {
+        if (target instanceof Class<?> type) return type;
+        return target.getClass();
+    }
+    
+    @TestOnly
+    protected byte[] retrieveCode(final Accessor object) {
+        if (object instanceof FieldAccessor<?> accessor)
+            return glass.writeFieldAccessor(accessor.getTargetType(), accessor.reflect(), accessor.getClass().getName()
+                .replace('.', '/'));
+        if (object instanceof MethodAccessor<?> accessor)
+            return glass.writeMethodAccessor(accessor.getTargetType(), accessor.reflect(), accessor.getClass().getName()
+                .replace('.', '/'));
+        if (object instanceof ConstructorAccessor<?> accessor)
+            return glass.writeConstructorAccessor(accessor.getTargetType(), accessor.reflect(), accessor.getClass()
+                .getName().replace('.', '/'));
+        return new byte[0];
     }
     
 }

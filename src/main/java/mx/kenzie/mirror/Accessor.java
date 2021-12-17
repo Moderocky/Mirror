@@ -10,4 +10,8 @@ public interface Accessor {
     
     void setTarget(Object object);
     
+    Object reflect();
+    
+    Class<?> getTargetType();
+    
 }

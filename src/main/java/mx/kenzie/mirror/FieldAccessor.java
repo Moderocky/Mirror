@@ -2,6 +2,7 @@ package mx.kenzie.mirror;
 
 import mx.kenzie.glass.Window;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 public interface FieldAccessor<Type> extends Window, Accessor {
@@ -9,6 +10,8 @@ public interface FieldAccessor<Type> extends Window, Accessor {
     Type get();
     
     void set(Object value);
+    
+    Field reflect();
     
     default Mirror<Type> mirror() {
         return Mirror.of(get());
@@ -19,6 +22,7 @@ public interface FieldAccessor<Type> extends Window, Accessor {
         protected int modifiers;
         protected boolean dynamic;
         protected Class<Type> type;
+        public Field handle;
         
         public FieldAccessorImpl(Thing target) {
             super(target);
@@ -46,6 +50,9 @@ public interface FieldAccessor<Type> extends Window, Accessor {
             return dynamic;
         }
         
+        public Field reflect() {
+            return handle;
+        }
     }
     
     class RelayedFieldAccessor<Thing, Type> extends FieldAccessorImpl<Thing, Type> {

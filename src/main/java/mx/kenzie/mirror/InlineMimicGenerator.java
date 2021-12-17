@@ -35,10 +35,10 @@ class InlineMimicGenerator extends MimicGenerator {
         return namespace;
     }
     
-    public <Template> Template createInline(LookingGlass glass) {
+    public <Template> Template createInline() {
         final boolean complex = !top.isInterface();
         final byte[] bytecode = writeCode();
-        final Class<?> type = glass.loadClass(top, internal.replace('/', '.'), bytecode);
+        final Class<?> type = mirror.glass.loadClass(top, internal.replace('/', '.'), bytecode);
         final Object object = this.allocateInstance(type);
         if (complex) {
             try {

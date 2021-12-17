@@ -49,6 +49,7 @@ class LookingGlass extends Glass implements ClassProvider {
             provider.assureAvailable(ConstructorAccessor.ConstructorAccessorImpl.class, target);
         }
         final ConstructorAccessor.ConstructorAccessorImpl<Thing> accessor = this.make(type, target);
+        accessor.handle = constructor;
         accessor.modifiers = constructor.getModifiers();
         accessor.dynamic = !this.isReachable(constructor);
         return accessor;
@@ -132,6 +133,7 @@ class LookingGlass extends Glass implements ClassProvider {
             provider.assureAvailable(MethodAccessor.MethodAccessorImpl.class, point);
         }
         final MethodAccessor.MethodAccessorImpl<Thing, Return> accessor = this.make(type, target);
+        accessor.handle = method;
         accessor.modifiers = method.getModifiers();
         accessor.dynamic = !this.isReachable(method);
         return accessor;
@@ -251,8 +253,9 @@ class LookingGlass extends Glass implements ClassProvider {
     //endregion
     
     void invokeDynamic(MethodVisitor visitor, Method method, String owner) {
-        final Handle bootstrap = Handles.createHandle(owner, "bootstrapInvoke", Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
-        if (!Modifier.isStatic(method.getModifiers())) {
+        final boolean dynamic = !Modifier.isStatic(method.getModifiers());
+        final Handle bootstrap = Handles.createHandle(owner, "bootstrapInvoke" + (dynamic ? "" : "Static"), Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
+        if (dynamic) {
             final List<Type> adjusted = new ArrayList<>();
             for (Class<?> type : method.getParameterTypes()) {
                 adjusted.add(Type.getType(type));
@@ -285,6 +288,7 @@ class LookingGlass extends Glass implements ClassProvider {
             provider.assureAvailable(FieldAccessor.FieldAccessorImpl.class, point);
         }
         final FieldAccessor.FieldAccessorImpl<Thing, Type> accessor = this.make(type, target);
+        accessor.handle = field;
         accessor.modifiers = field.getModifiers();
         accessor.dynamic = !this.isReachable(field);
         accessor.type = (Class<Type>) field.getType();
@@ -313,9 +317,11 @@ class LookingGlass extends Glass implements ClassProvider {
             final Class<?> type = field.getType();
             visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC, "set", "(Ljava/lang/Object;)V", null, null);
             visitor.visitCode();
-            visitor.visitVarInsn(ALOAD, 0);
-            visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
-            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType));
+            if (!Modifier.isStatic(field.getModifiers())) {
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
+                visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType));
+            }
             visitor.visitVarInsn(ALOAD, 1);
             visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(this.getWrapperType(type)));
             if (type.isPrimitive()) this.unbox(visitor, type);
@@ -333,9 +339,11 @@ class LookingGlass extends Glass implements ClassProvider {
             final Class<?> type = field.getType();
             visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC, "get", "()Ljava/lang/Object;", null, null);
             visitor.visitCode();
-            visitor.visitVarInsn(ALOAD, 0);
-            visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
-            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType));
+            if (!Modifier.isStatic(field.getModifiers())) {
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
+                visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType));
+            }
             if (this.isReachable(field)) this.getNormal(visitor, field);
             else this.getDynamic(visitor, field, location);
             if (type.isPrimitive()) this.box(visitor, type);
@@ -395,7 +403,8 @@ class LookingGlass extends Glass implements ClassProvider {
     //endregion
     
     void getDynamic(MethodVisitor visitor, Field field, String owner) {
-        final Handle bootstrap = Handles.createHandle(owner, "bootstrapGetter", Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
+        final boolean dynamic = !Modifier.isStatic(field.getModifiers());
+        final Handle bootstrap = Handles.createHandle(owner, "bootstrapGetter" + (dynamic ? "" : "Static"), Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
         final String descriptor;
         if (Modifier.isStatic(field.getModifiers()))
             descriptor = Type.getMethodDescriptor(Type.getType(field.getType()));
@@ -405,7 +414,8 @@ class LookingGlass extends Glass implements ClassProvider {
     }
     
     void setDynamic(MethodVisitor visitor, Field field, String owner) {
-        final Handle bootstrap = Handles.createHandle(owner, "bootstrapSetter", Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
+        final boolean dynamic = !Modifier.isStatic(field.getModifiers());
+        final Handle bootstrap = Handles.createHandle(owner, "bootstrapSetter" + (dynamic ? "" : "Static"), Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
         final Type[] types;
         if (Modifier.isStatic(field.getModifiers())) types = new Type[]{Type.getType(field.getType())};
         else types = new Type[]{Type.getType(field.getDeclaringClass()), Type.getType(field.getType())};
@@ -432,7 +442,20 @@ class LookingGlass extends Glass implements ClassProvider {
             name = InlineMimicGenerator.getStrictPackageName(template);
         }
         return (new InlineMimicGenerator(name.replace('.', '/') + "/Mimic_" + hash + Mimic.RANDOM.nextInt(10000, 99999), template, mirror))
-            .createInline(this);
+            .createInline();
+    }
+    
+    <Template, Thing> Template makeIntrinsicProxy(Mirror<Thing> mirror, Class<Template> template) {
+        int hash = Objects.hash(template);
+        final String name;
+        if (provider instanceof InternalAccessProvider provider) {
+            name = template.getPackageName();
+            provider.export(template.getModule(), name);
+        } else {
+            name = InlineMimicGenerator.getStrictPackageName(template);
+        }
+        return (new IntrinsicMimicGenerator(name.replace('.', '/') + "/Mimic_" + hash + Mimic.RANDOM.nextInt(10000, 99999), template, mirror))
+            .createInline();
     }
     //endregion
     
@@ -525,7 +548,7 @@ class LookingGlass extends Glass implements ClassProvider {
         if (Modifier.isStatic(field.getModifiers())) {
             setter:
             {
-                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapSetter", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapSetterStatic", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
                 visitor.visitCode();
                 visitor.visitVarInsn(ALOAD, 3);
                 visitor.visitVarInsn(ALOAD, 0);
@@ -549,7 +572,7 @@ class LookingGlass extends Glass implements ClassProvider {
             }
             getter:
             {
-                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapGetter", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapGetterStatic", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
                 visitor.visitCode();
                 visitor.visitVarInsn(ALOAD, 3);
                 visitor.visitVarInsn(ALOAD, 0);
@@ -622,9 +645,10 @@ class LookingGlass extends Glass implements ClassProvider {
     }
     
     protected void writeBootstrapper(ClassWriter writer, Method method) {
+        final boolean dynamic = !Modifier.isStatic(method.getModifiers());
         final MethodVisitor visitor;
-        if (Modifier.isStatic(method.getModifiers())) {
-            visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC, "bootstrapInvoke", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+        if (!dynamic) {
+            visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC, "bootstrapInvokeStatic", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
             visitor.visitCode();
             visitor.visitVarInsn(ALOAD, 3);
             visitor.visitVarInsn(ALOAD, 0);

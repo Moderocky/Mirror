@@ -3,6 +3,7 @@ package mx.kenzie.mirror;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 /**
  * Mirrors a type for accessing its members.
@@ -33,15 +34,17 @@ public class Mirror<Thing> {
     }
     
     /**
-     * Creates a 'magic' mirror that follows the methods of the provided interface.
+     * Creates a 'magic' mirror that follows the methods of the provided class.
+     * Using an interface here is recommended, but allows any class type.
      *
-     * @param template   the template interface to use
-     * @param <Template> the interface type
-     * @return the populated interface
+     * @param template   the template class to use
+     * @param <Template> the template type
+     * @return the populated template
      */
     public <Template> Template magic(Class<Template> template) {
-        if (!template.isInterface()) throw new IllegalArgumentException("Template must be an interface.");
-        return glass.makeProxy(Mirror.of(target), template);
+        if (Modifier.isFinal(template.getModifiers()))
+            throw new IllegalArgumentException("Template must not be final.");
+        return glass.makeInlineProxy(Mirror.of(target), template);
     }
     
     /**
@@ -75,7 +78,7 @@ public class Mirror<Thing> {
      * @param <Type>      the type this constructor makes
      * @return the constructor accessor
      */
-    public <Type> ConstructorAccessor<Type> constructor(Constructor<?> constructor) {
+    public <Type> ConstructorAccessor<Type> constructor(Constructor<Type> constructor) {
         return glass.createAccessor(target.getClass(), constructor);
     }
     

@@ -2,6 +2,7 @@ package mx.kenzie.mirror;
 
 import mx.kenzie.glass.Glass;
 import mx.kenzie.glass.Window;
+import mx.kenzie.mimic.Mimic;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
@@ -38,12 +39,14 @@ class LookingGlass extends Glass implements ClassProvider {
             .hashCode() + Objects.hash((Object[]) constructor.getParameterTypes());
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
-        else {
+        else create:{
             final String path = this.getExportedPackageFrom(target);
             final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeConstructorAccessor(target, constructor, location);
             type = this.loadClass(target, path + ".Method_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
+            if (!(this.provider instanceof InternalAccessProvider provider)) break create;
+            provider.assureAvailable(ConstructorAccessor.ConstructorAccessorImpl.class, target);
         }
         final ConstructorAccessor.ConstructorAccessorImpl<Thing> accessor = this.make(type, target);
         accessor.modifiers = constructor.getModifiers();
@@ -119,12 +122,14 @@ class LookingGlass extends Glass implements ClassProvider {
         final Class<?> point = target instanceof Class c ? c : target.getClass();
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
-        else {
+        else create:{
             final String path = this.getExportedPackageFrom(point);
             final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeMethodAccessor(point, method, location);
             type = this.loadClass(LookingGlass.class, path + ".Method_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
+            if (!(this.provider instanceof InternalAccessProvider provider)) break create;
+            provider.assureAvailable(MethodAccessor.MethodAccessorImpl.class, point);
         }
         final MethodAccessor.MethodAccessorImpl<Thing, Return> accessor = this.make(type, target);
         accessor.modifiers = method.getModifiers();
@@ -269,13 +274,15 @@ class LookingGlass extends Glass implements ClassProvider {
             .hashCode() + field.getType().hashCode();
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
-        else {
+        else create:{
             final Class<?> point = target instanceof Class c ? c : target.getClass();
             final String path = this.getExportedPackageFrom(point);
             final String location = path.replace('.', '/') + "/Field_" + hash;
             final byte[] bytecode = this.writeFieldAccessor(point, field, location);
             type = this.loadClass(point, path + ".Field_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
+            if (!(this.provider instanceof InternalAccessProvider provider)) break create;
+            provider.assureAvailable(FieldAccessor.FieldAccessorImpl.class, point);
         }
         final FieldAccessor.FieldAccessorImpl<Thing, Type> accessor = this.make(type, target);
         accessor.modifiers = field.getModifiers();
@@ -415,11 +422,17 @@ class LookingGlass extends Glass implements ClassProvider {
         }
     }
     
-    <Template, Thing> Template makeProxy(Mirror<Thing> mirror, Class<Template> template) {
-        final ClassLoader loader;
-        if (template.getClassLoader() == null) loader = this.loader;
-        else loader = template.getClassLoader();
-        return (Template) Proxy.newProxyInstance(loader, new Class[]{template}, new ProxyAccessor<>(mirror));
+    <Template, Thing> Template makeInlineProxy(Mirror<Thing> mirror, Class<Template> template) {
+        int hash = Objects.hash(template);
+        final String name;
+        if (provider instanceof InternalAccessProvider provider) {
+            name = template.getPackageName();
+            provider.export(template.getModule(), name);
+        } else {
+            name = InlineMimicGenerator.getStrictPackageName(template);
+        }
+        return (new InlineMimicGenerator(name.replace('.', '/') + "/Mimic_" + hash + Mimic.RANDOM.nextInt(10000, 99999), template, mirror))
+            .createInline(this);
     }
     //endregion
     

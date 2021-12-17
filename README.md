@@ -47,14 +47,15 @@ Mirror avoids this by writing a normal invocation call where possible, meaning t
 
 The timings below are based on running the speed check in `BasicTest` on my laptop.
 
-| Access Type              | Average Speed |
-|--------------------------|---------------|
-| Normal Invocation        | ~4ns          |
-| Access Public Member     | ~6ns          |
-| Access Hidden Member     | ~40ns         |
-| Access Restricted Member | ~80ns         |
-| Reflection               | ~220ns        |
-| Proxy Invocation         | ~1200ns       |
+| Access Type                         | Average Speed |
+|-------------------------------------|---------------|
+| Normal Invocation                   | ~4ns          |
+| Access Public Member                | ~6ns          |
+| Access Hidden Member                | ~40ns         |
+| Access Member via `Mirror#unsafe()` | ~80ns         |
+| Magic Mirror Invocation             | ~40ns         |
+| ~~Reflection~~ (JDK)                | ~220ns        |
+| ~~Proxy Invocation~~ (JDK)          | ~1300ns       |
 
 ## Migrating from v4.0.0
 
@@ -64,9 +65,18 @@ An object or class is first targeted with `Mirror.of(thing)`, from which special
 
 ## Magic Mirrors
 
-Magic mirrors are a feature borrowed from Mirror v4, allowing the smart binding of user-defined interface methods to hidden methods. These are slower than normal method accessors, as they use Java's proxy system internally (which has a lot of needless boilerplate.)
+Magic mirrors are a feature borrowed from Mirror v4, allowing the smart binding of user-defined interface methods to hidden methods. These are slower than normal method accessors, though still faster than using Java reflection.
 
-In the future these will be changed to use [Glass](https://github.com/Moderocky/Glass) for a faster, more adaptive proxy creation system.
+Magic mirrors originally used Java's proxy system internally (which has a lot of needless bloat) but in Mirror v5 they were switched over to [Mimic](https://github.com/Moderocky/Mimic) which is a significantly faster and more adaptive replacement for proxies.
+
+The magic mirror implementation in v4 used a proxy, performed a table lookup and then called the method invoker, costing around `2000` nanoseconds.
+When switching to the v5 MethodAccessors and improving the table lookup, this was reduced to `1200` nanoseconds.
+After switching from Java's proxies to [Mimic](https://github.com/Moderocky/Mimic), this process was reduced to `200` nanoseconds, almost six times faster than proxies.
+By hardcoding the method calls to remove the table lookup and bridge call entirely, this averages at `33` nanoseconds and is comparable to using the MethodAccessor directly, meaning it takes a little more than 1.5% of the time that v4 took.
+
+This means that for the first time ever, magic mirrors are a viable alternative in performance-dependent projects and implementations, especially those requiring a lot of repetitive calls which can benefit from JIT.
+
+Another benefit of using Mimic is that the magic mirrors can use non-final default classes as templates, increasing developer freedom.
 
 ```java 
 interface Test {
@@ -82,7 +92,14 @@ assert test.thing(3) == 5;
 Java 17+ has tried to make it impossible to access private members in named modules (such as `jdk.internal` resources.)
 As some libraries depend on these, Mirror v5 has a way of accessing them. This is a particularly **dangerous** method, so it is advised not to be used unless absolutely necessary.
 
-Calling the `unsafe` method on a mirror will replace the code-writer with one capable of using the native bootstrap classloader, which is traditionally inaccessible.
+By default, Mirror will attempt to inject the accessor into whatever class-loader the target member is provided by, and then exports the accessor to the caller class.
+This will allow access to named modules and even JDK internals, which reflection would not.
+
+If this is not sufficient (for example, if a module has some way of blocking the export process) an accessor-chain can be used. This creates two separate accessors: an out-facing one is placed within some accessible namespace of the target module (the module must have *some* open-facing attachment point in order to be running within the same JVM as your code) and a bridge is placed in an intermediary namespace, relaying the access calls.
+
+Calling the `unsafe` method on a mirror will replace the code-writer with one capable of building these chain-calls, but is only accessible in an environment where Java's `Unsafe` is accessible, since this is needed to access the native bootstrap classloader and inject the accessors.
+
+Generally speaking, this chain version will not be necessary - even internal JDK modules are accessible via the smart export system.
 
 ```java 
 final MethodAccessor<Class<?>[]> accessor = Mirror.of(Class.class)

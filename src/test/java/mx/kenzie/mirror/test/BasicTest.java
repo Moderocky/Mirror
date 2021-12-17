@@ -17,6 +17,10 @@ public class BasicTest {
         return 6;
     }
     
+    public int blob2() {
+        return 5;
+    }
+    
     public static void main(String[] args) throws Throwable {
         final Object object = new BasicTest();
         final int tries = 100000;
@@ -125,13 +129,27 @@ public class BasicTest {
         
         interface Template {
             int blob();
+            
+            int blob2();
         }
         final Template template = Mirror.of(new BasicTest())
             .magic(Template.class);
         for (int i = 0; i < tries; i++) {
             template.blob();
+            template.blob2();
         }
         magic_invoke:
+        {
+            final long start, end;
+            start = System.nanoTime();
+            for (int i = 0; i < tries; i++) {
+                template.blob2();
+            }
+            end = System.nanoTime();
+            System.out.println("Using magic invocation on public member " + tries + " times took " + (end - start) + " nanos. (Avg. " + (end - start) / tries + ")");
+        }
+        
+        magic_invoke_hidden:
         {
             final long start, end;
             start = System.nanoTime();
@@ -139,7 +157,7 @@ public class BasicTest {
                 template.blob();
             }
             end = System.nanoTime();
-            System.out.println("Using magic invocation " + tries + " times took " + (end - start) + " nanos. (Avg. " + (end - start) / tries + ")");
+            System.out.println("Using magic invocation on hidden member " + tries + " times took " + (end - start) + " nanos. (Avg. " + (end - start) / tries + ")");
         }
         
     }

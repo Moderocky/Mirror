@@ -1,11 +1,14 @@
 package mx.kenzie.mirror;
 
+import org.objectweb.asm.Type;
 import sun.misc.Unsafe;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.*;
 import java.security.*;
 
-@SuppressWarnings("all")
+@SuppressWarnings({"removal", "deprecated", "unchecked", "Duplicates", "TypeParameterHidesVisibleType"})
 class InternalAccessProvider implements ClassProvider {
     
     final Object javaLangAccess;
@@ -44,9 +47,7 @@ class InternalAccessProvider implements ClassProvider {
     }
     
     Class<?> findClass(Class<?> target, String name) {
-        final Module module = target.getModule();
-        PrivilegedAction<ClassLoader> pa = module::getClassLoader;
-        final ClassLoader loader = AccessController.doPrivileged(pa);
+        final ClassLoader loader = this.getClassLoader(target.getModule());
         try {
             return Class.forName(name, true, loader);
         } catch (ClassNotFoundException ex) {
@@ -54,21 +55,47 @@ class InternalAccessProvider implements ClassProvider {
         }
     }
     
+    ClassLoader getClassLoader(Module target) {
+        PrivilegedAction<ClassLoader> pa = target::getClassLoader;
+        return AccessController.doPrivileged(pa);
+    }
+    
     @Override
     public Class<?> loadClass(Class<?> target, String name, byte[] bytes) {
         try {
-            final Module module = target.getModule();
-            PrivilegedAction<ClassLoader> pa = module::getClassLoader;
-            final ClassLoader loader = AccessController.doPrivileged(pa);
+            final ClassLoader loader = this.getClassLoader(target.getModule());
             try {
                 return Class.forName(name, true, loader);
             } catch (ClassNotFoundException ex) {
-                final Class<?> type = (Class<?>) defineClass.invoke(javaLangAccess, loader, name, bytes, null, "__Mirror__");
-                return type;
+                return (Class<?>) defineClass.invoke(javaLangAccess, loader, name, bytes, null, "__Mirror__");
             }
         } catch (InvocationTargetException | IllegalAccessException e) {
-            e.printStackTrace();
-            return null;
+            throw new RuntimeException("Unable to load class.", e);
+        }
+    }
+    
+    void assureAvailable(Class<?> resource, Class<?> target) {
+        if (resource == null) return;
+        if (resource.getSuperclass() != Object.class && resource.getSuperclass() != Class.class)
+            this.assureAvailable(resource.getSuperclass(), target);
+        for (final Class<?> template : resource.getInterfaces()) {
+            this.assureAvailable(template, target);
+        }
+        try {
+            Class.forName(resource.getName(), true, this.getClassLoader(target.getModule()));
+        } catch (ClassNotFoundException ex) {
+            final byte[] bytecode = this.getSource(Type.getInternalName(resource));
+            if (bytecode.length == 0) return;
+            this.loadClass(target, resource.getName(), bytecode);
+        }
+    }
+    
+    byte[] getSource(final String type) {
+        try (final InputStream stream = ClassLoader.getSystemResourceAsStream(type + ".class")) {
+            if (stream == null) return new byte[0];
+            return stream.readAllBytes();
+        } catch (IOException ex) {
+            return new byte[0];
         }
     }
     
@@ -77,7 +104,6 @@ class InternalAccessProvider implements ClassProvider {
             addExports0.invoke(null, module, namespace, LookingGlass.class.getModule());
             addExportsToAllUnnamed0.invoke(null, module, namespace);
         } catch (InvocationTargetException | IllegalAccessException e) {
-            e.printStackTrace();
             module.addExports(namespace, LookingGlass.class.getModule());
         }
     }

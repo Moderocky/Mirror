@@ -93,6 +93,12 @@
         </dependency>
         <dependency>
             <groupId>mx.kenzie</groupId>
+            <artifactId>mimic</artifactId>
+            <version>1.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>mx.kenzie</groupId>
             <artifactId>glass</artifactId>
             <version>1.0.0</version>
             <scope>compile</scope>

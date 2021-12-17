@@ -23,6 +23,10 @@ public class MethodAccessorTest {
         return i + j;
     }
     
+    private int test() {
+        return 1;
+    }
+    
     @BeforeClass
     public static void warmUp() {
         final Mirror<?> mirror = Mirror.of(new MethodAccessorTest());
@@ -66,6 +70,12 @@ public class MethodAccessorTest {
         assert accessor.isStatic();
         assert !accessor.isDynamicAccess();
         assert (int) accessor.invoke(2, 3) == 5;
+    }
+    
+    @Test
+    public void noArgs() {
+        final MethodAccessor<Integer> accessor = Mirror.of(this).method("test");
+        assert accessor.invoke() == 1;
     }
     
 }

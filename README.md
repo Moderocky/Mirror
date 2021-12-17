@@ -47,13 +47,14 @@ Mirror avoids this by writing a normal invocation call where possible, meaning t
 
 The timings below are based on running the speed check in `BasicTest` on my laptop.
 
-| Access Type          | Average Speed |
-|----------------------|---------------|
-| Normal Invocation    | ~4ns          |
-| Access Public Member | ~6ns          |
-| Access Hidden Member | ~40ns         |
-| Reflection           | ~200ns        |
-| Proxy Invocation     | ~1200ns       |
+| Access Type              | Average Speed |
+|--------------------------|---------------|
+| Normal Invocation        | ~4ns          |
+| Access Public Member     | ~6ns          |
+| Access Hidden Member     | ~40ns         |
+| Access Restricted Member | ~80ns         |
+| Reflection               | ~220ns        |
+| Proxy Invocation         | ~1200ns       |
 
 ## Migrating from v4.0.0
 

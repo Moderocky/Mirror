@@ -7,6 +7,7 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
+import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.*;
@@ -19,6 +20,16 @@ import static org.objectweb.asm.Opcodes.*;
 @SuppressWarnings({"unchecked", "Duplicates", "UnusedLabel", "TypeParameterHidesVisibleType"})
 class LookingGlass extends Glass implements ClassProvider {
     
+    protected ClassProvider provider;
+    
+    {
+        try {
+            provider = new InternalAccessProvider();
+        } catch (Throwable ex) {
+            provider = null;
+        }
+    }
+    
     //region Constructor Accessor Generation
     <Thing>
     ConstructorAccessor<Thing> createAccessor(Class<?> target, Constructor<?> constructor) {
@@ -28,9 +39,10 @@ class LookingGlass extends Glass implements ClassProvider {
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
         else {
-            final String location = "mx/kenzie/mirror/generated/Method_" + hash;
+            final String path = this.getExportedPackageFrom(target);
+            final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeConstructorAccessor(target, constructor, location);
-            type = this.loadClass(target, "mx.kenzie.mirror.generated.Method_" + hash, bytecode);
+            type = this.loadClass(target, path + ".Method_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
         }
         final ConstructorAccessor.ConstructorAccessorImpl<Thing> accessor = this.make(type, target);
@@ -108,9 +120,10 @@ class LookingGlass extends Glass implements ClassProvider {
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
         else {
-            final String location = "mx/kenzie/mirror/generated/Method_" + hash;
+            final String path = this.getExportedPackageFrom(point);
+            final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeMethodAccessor(point, method, location);
-            type = this.loadClass(LookingGlass.class, "mx.kenzie.mirror.generated.Method_" + hash, bytecode);
+            type = this.loadClass(LookingGlass.class, path + ".Method_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
         }
         final MethodAccessor.MethodAccessorImpl<Thing, Return> accessor = this.make(type, target);
@@ -134,6 +147,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitMaxs(2, 2);
             visitor.visitEnd();
         }
+        if (!this.isReachable(method)) this.writeBootstrapper(writer, method);
         this.writeInvoker(writer, method, location, targetType);
         return writer.toByteArray();
     }
@@ -142,7 +156,7 @@ class LookingGlass extends Glass implements ClassProvider {
         final MethodVisitor visitor;
         final Type methodType = Type.getMethodType(Type.getType(Object.class), Type.getType(Object[].class));
         final Class<?>[] parameters = method.getParameterTypes();
-        visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC, "invoke", methodType.getDescriptor(), null, null);
+        visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE, "invoke", methodType.getDescriptor(), null, null);
         visitor.visitCode();
         if (!Modifier.isStatic(method.getModifiers())) {
             visitor.visitVarInsn(ALOAD, 0);
@@ -163,7 +177,7 @@ class LookingGlass extends Glass implements ClassProvider {
             }
         }
         if (this.isReachable(method)) this.invokeNormal(visitor, method);
-        else this.invokeDynamic(visitor, method);
+        else this.invokeDynamic(visitor, method, location);
         if (method.getReturnType().isPrimitive())
             this.box(visitor, method.getReturnType());
         visitor.visitInsn(ARETURN);
@@ -231,6 +245,20 @@ class LookingGlass extends Glass implements ClassProvider {
     }
     //endregion
     
+    void invokeDynamic(MethodVisitor visitor, Method method, String owner) {
+        final Handle bootstrap = Handles.createHandle(owner, "bootstrapInvoke", Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
+        if (!Modifier.isStatic(method.getModifiers())) {
+            final List<Type> adjusted = new ArrayList<>();
+            for (Class<?> type : method.getParameterTypes()) {
+                adjusted.add(Type.getType(type));
+            }
+            adjusted.add(0, Type.getType(method.getDeclaringClass()));
+            visitor.visitInvokeDynamicInsn(method.getName(), Type.getMethodDescriptor(Type.getType(method.getReturnType()), adjusted.toArray(new Type[0])), bootstrap, Type.getType(method.getDeclaringClass()));
+        } else {
+            visitor.visitInvokeDynamicInsn(method.getName(), Type.getMethodDescriptor(method), bootstrap, Type.getType(method.getDeclaringClass()));
+        }
+    }
+    
     //region Field Accessor Generation
     <
         Thing,
@@ -243,9 +271,10 @@ class LookingGlass extends Glass implements ClassProvider {
         if (cache.containsKey(hash)) type = cache.get(hash);
         else {
             final Class<?> point = target instanceof Class c ? c : target.getClass();
-            final String location = "mx/kenzie/mirror/generated/Field_" + hash;
+            final String path = this.getExportedPackageFrom(point);
+            final String location = path.replace('.', '/') + "/Field_" + hash;
             final byte[] bytecode = this.writeFieldAccessor(point, field, location);
-            type = this.loadClass(point, "mx.kenzie.mirror.generated.Field_" + hash, bytecode);
+            type = this.loadClass(point, path + ".Field_" + hash, bytecode);
             cache.put(hash, (Class<? extends Window.WindowFrame>) type);
         }
         final FieldAccessor.FieldAccessorImpl<Thing, Type> accessor = this.make(type, target);
@@ -270,6 +299,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitMaxs(2, 2);
             visitor.visitEnd();
         }
+        if (!this.isReachable(field)) this.writeBootstrapper(writer, field);
         setter:
         {
             final MethodVisitor visitor;
@@ -283,7 +313,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(this.getWrapperType(type)));
             if (type.isPrimitive()) this.unbox(visitor, type);
             if (this.isReachable(field)) this.setNormal(visitor, field);
-            else this.setDynamic(visitor, field);
+            else this.setDynamic(visitor, field, location);
             visitor.visitInsn(RETURN);
             final int offset = this.wideIndexOffset(field.getType());
             final int size = 3 + offset;
@@ -300,7 +330,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
             visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType));
             if (this.isReachable(field)) this.getNormal(visitor, field);
-            else this.getDynamic(visitor, field);
+            else this.getDynamic(visitor, field, location);
             if (type.isPrimitive()) this.box(visitor, type);
             visitor.visitInsn(ARETURN);
             final int offset = this.wideIndexOffset(field.getType());
@@ -357,6 +387,24 @@ class LookingGlass extends Glass implements ClassProvider {
     }
     //endregion
     
+    void getDynamic(MethodVisitor visitor, Field field, String owner) {
+        final Handle bootstrap = Handles.createHandle(owner, "bootstrapGetter", Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
+        final String descriptor;
+        if (Modifier.isStatic(field.getModifiers()))
+            descriptor = Type.getMethodDescriptor(Type.getType(field.getType()));
+        else
+            descriptor = Type.getMethodDescriptor(Type.getType(field.getType()), Type.getType(field.getDeclaringClass()));
+        visitor.visitInvokeDynamicInsn(field.getName(), descriptor, bootstrap, Type.getType(field.getDeclaringClass()));
+    }
+    
+    void setDynamic(MethodVisitor visitor, Field field, String owner) {
+        final Handle bootstrap = Handles.createHandle(owner, "bootstrapSetter", Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
+        final Type[] types;
+        if (Modifier.isStatic(field.getModifiers())) types = new Type[]{Type.getType(field.getType())};
+        else types = new Type[]{Type.getType(field.getDeclaringClass()), Type.getType(field.getType())};
+        visitor.visitInvokeDynamicInsn(field.getName(), Type.getMethodDescriptor(Type.getType(void.class), types), bootstrap, Type.getType(field.getDeclaringClass()));
+    }
+    
     //region Creators
     <Template> Template make(Class<?> type, Object target) {
         try {
@@ -392,7 +440,7 @@ class LookingGlass extends Glass implements ClassProvider {
     }
     
     ClassProvider getProvider() {
-        return this;
+        return provider;
     }
     //endregion
     
@@ -410,7 +458,7 @@ class LookingGlass extends Glass implements ClassProvider {
     //endregion
     
     //region Boxing
-    private Class<?> getWrapperType(Class<?> primitive) {
+    Class<?> getWrapperType(Class<?> primitive) {
         if (primitive == byte.class) return Byte.class;
         if (primitive == short.class) return Short.class;
         if (primitive == int.class) return Integer.class;
@@ -422,7 +470,7 @@ class LookingGlass extends Glass implements ClassProvider {
         return primitive;
     }
     
-    private void unbox(MethodVisitor visitor, Class<?> parameter) {
+    void unbox(MethodVisitor visitor, Class<?> parameter) {
         if (parameter == byte.class)
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(Byte.class), "byteValue", "()B", false);
         if (parameter == short.class)
@@ -458,6 +506,163 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitInsn(ACONST_NULL);
     }
     //endregion
+    
+    //region Bootstrap Methods
+    protected void writeBootstrapper(ClassWriter writer, Field field) {
+        if (Modifier.isStatic(field.getModifiers())) {
+            setter:
+            {
+                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapSetter", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+                visitor.visitCode();
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitMethodInsn(INVOKESTATIC, "java/lang/invoke/MethodHandles", "privateLookupIn", "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;", false);
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 1);
+                visitor.visitVarInsn(ALOAD, 2);
+                visitor.visitInsn(ICONST_0);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodType", "parameterType", "(I)Ljava/lang/Class;", false);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "findStaticVarHandle", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;", false);
+                visitor.visitFieldInsn(GETSTATIC, "java/lang/invoke/VarHandle$AccessMode", "SET", "Ljava/lang/invoke/VarHandle$AccessMode;");
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "toMethodHandle", "(Ljava/lang/invoke/VarHandle$AccessMode;)Ljava/lang/invoke/MethodHandle;", false);
+                visitor.visitVarInsn(ASTORE, 4);
+                visitor.visitTypeInsn(NEW, "java/lang/invoke/ConstantCallSite");
+                visitor.visitInsn(DUP);
+                visitor.visitVarInsn(ALOAD, 4);
+                visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
+                visitor.visitInsn(ARETURN);
+                visitor.visitMaxs(5, 5);
+                visitor.visitEnd();
+            }
+            getter:
+            {
+                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC, "bootstrapGetter", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+                visitor.visitCode();
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitMethodInsn(INVOKESTATIC, "java/lang/invoke/MethodHandles", "privateLookupIn", "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;", false);
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 1);
+                visitor.visitVarInsn(ALOAD, 2);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodType", "returnType", "()Ljava/lang/Class;", false);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "findStaticVarHandle", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;", false);
+                visitor.visitFieldInsn(GETSTATIC, "java/lang/invoke/VarHandle$AccessMode", "GET", "Ljava/lang/invoke/VarHandle$AccessMode;");
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "toMethodHandle", "(Ljava/lang/invoke/VarHandle$AccessMode;)Ljava/lang/invoke/MethodHandle;", false);
+                visitor.visitVarInsn(ASTORE, 4);
+                visitor.visitTypeInsn(NEW, "java/lang/invoke/ConstantCallSite");
+                visitor.visitInsn(DUP);
+                visitor.visitVarInsn(ALOAD, 4);
+                visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
+                visitor.visitInsn(ARETURN);
+                visitor.visitMaxs(4, 5);
+                visitor.visitEnd();
+            }
+        } else {
+            setter:
+            {
+                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC, "bootstrapSetter", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+                visitor.visitCode();
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitMethodInsn(INVOKESTATIC, "java/lang/invoke/MethodHandles", "privateLookupIn", "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;", false);
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 1);
+                visitor.visitVarInsn(ALOAD, 2);
+                visitor.visitInsn(ICONST_1);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodType", "parameterType", "(I)Ljava/lang/Class;", false);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "findVarHandle", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;", false);
+                visitor.visitFieldInsn(GETSTATIC, "java/lang/invoke/VarHandle$AccessMode", "SET", "Ljava/lang/invoke/VarHandle$AccessMode;");
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "toMethodHandle", "(Ljava/lang/invoke/VarHandle$AccessMode;)Ljava/lang/invoke/MethodHandle;", false);
+                visitor.visitVarInsn(ASTORE, 4);
+                visitor.visitTypeInsn(NEW, "java/lang/invoke/ConstantCallSite");
+                visitor.visitInsn(DUP);
+                visitor.visitVarInsn(ALOAD, 4);
+                visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
+                visitor.visitInsn(ARETURN);
+                visitor.visitMaxs(5, 5);
+                visitor.visitEnd();
+            }
+            getter:
+            {
+                final MethodVisitor visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC, "bootstrapGetter", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+                visitor.visitCode();
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitMethodInsn(INVOKESTATIC, "java/lang/invoke/MethodHandles", "privateLookupIn", "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;", false);
+                visitor.visitVarInsn(ALOAD, 3);
+                visitor.visitVarInsn(ALOAD, 1);
+                visitor.visitVarInsn(ALOAD, 2);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodType", "returnType", "()Ljava/lang/Class;", false);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "findVarHandle", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/VarHandle;", false);
+                visitor.visitFieldInsn(GETSTATIC, "java/lang/invoke/VarHandle$AccessMode", "GET", "Ljava/lang/invoke/VarHandle$AccessMode;");
+                visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/VarHandle", "toMethodHandle", "(Ljava/lang/invoke/VarHandle$AccessMode;)Ljava/lang/invoke/MethodHandle;", false);
+                visitor.visitVarInsn(ASTORE, 4);
+                visitor.visitTypeInsn(NEW, "java/lang/invoke/ConstantCallSite");
+                visitor.visitInsn(DUP);
+                visitor.visitVarInsn(ALOAD, 4);
+                visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
+                visitor.visitInsn(ARETURN);
+                visitor.visitMaxs(4, 5);
+                visitor.visitEnd();
+            }
+        }
+    }
+    
+    protected void writeBootstrapper(ClassWriter writer, Method method) {
+        final MethodVisitor visitor;
+        if (Modifier.isStatic(method.getModifiers())) {
+            visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC, "bootstrapInvoke", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+            visitor.visitCode();
+            visitor.visitVarInsn(ALOAD, 3);
+            visitor.visitVarInsn(ALOAD, 0);
+            visitor.visitMethodInsn(INVOKESTATIC, "java/lang/invoke/MethodHandles", "privateLookupIn", "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;", false);
+            visitor.visitVarInsn(ALOAD, 3);
+            visitor.visitVarInsn(ALOAD, 1);
+            visitor.visitVarInsn(ALOAD, 2);
+            visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "findStatic", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;", false);
+            visitor.visitVarInsn(ASTORE, 4);
+            visitor.visitTypeInsn(NEW, "java/lang/invoke/ConstantCallSite");
+            visitor.visitInsn(DUP);
+            visitor.visitVarInsn(ALOAD, 4);
+            visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
+            visitor.visitInsn(ARETURN);
+            visitor.visitMaxs(4, 5);
+        } else {
+            visitor = writer.visitMethod(ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC, "bootstrapInvoke", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/CallSite;", null, null);
+            visitor.visitCode();
+            visitor.visitVarInsn(ALOAD, 2);
+            visitor.visitInsn(ICONST_0);
+            visitor.visitInsn(ICONST_1);
+            visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodType", "dropParameterTypes", "(II)Ljava/lang/invoke/MethodType;", false);
+            visitor.visitVarInsn(ASTORE, 5);
+            visitor.visitVarInsn(ALOAD, 3);
+            visitor.visitVarInsn(ALOAD, 0);
+            visitor.visitMethodInsn(INVOKESTATIC, "java/lang/invoke/MethodHandles", "privateLookupIn", "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)Ljava/lang/invoke/MethodHandles$Lookup;", false);
+            visitor.visitVarInsn(ALOAD, 3);
+            visitor.visitVarInsn(ALOAD, 1);
+            visitor.visitVarInsn(ALOAD, 5);
+            visitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "findVirtual", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;", false);
+            visitor.visitVarInsn(ASTORE, 4);
+            visitor.visitTypeInsn(NEW, "java/lang/invoke/ConstantCallSite");
+            visitor.visitInsn(DUP);
+            visitor.visitVarInsn(ALOAD, 4);
+            visitor.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/ConstantCallSite", "<init>", "(Ljava/lang/invoke/MethodHandle;)V", false);
+            visitor.visitInsn(ARETURN);
+            visitor.visitMaxs(4, 6);
+        }
+        visitor.visitEnd();
+    }
+    //endregion
+    
+    protected String getExportedPackageFrom(Class<?> place) {
+        final Module module = place.getModule();
+        final String namespace;
+        if (place.getPackageName().startsWith("java.lang")) namespace = "jdk.internal.reflect"; // prohibited namespace
+        else namespace = place.getPackageName();
+        if (getProvider() instanceof InternalAccessProvider provider)
+            provider.export(module, namespace);
+        return namespace;
+    }
     
     interface Handles {
         

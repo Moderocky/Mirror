@@ -12,6 +12,7 @@ class InternalAccessProvider implements ClassProvider {
     final Unsafe unsafe;
     final Method defineClass;
     final Method addExports0;
+    final Method addExportsToAllUnnamed0;
     final Method newInstanceWithCaller;
     
     InternalAccessProvider() throws ClassNotFoundException, PrivilegedActionException, NoSuchFieldException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
@@ -30,6 +31,8 @@ class InternalAccessProvider implements ClassProvider {
         setAccessible0.invoke(implAddExportsOrOpens, true);
         addExports0 = Module.class.getDeclaredMethod("addExports0", Module.class, String.class, Module.class);
         setAccessible0.invoke(addExports0, true);
+        addExportsToAllUnnamed0 = Module.class.getDeclaredMethod("addExportsToAllUnnamed0", Module.class, String.class);
+        setAccessible0.invoke(addExportsToAllUnnamed0, true);
         final Method getJavaLangAccess = secrets.getDeclaredMethod("getJavaLangAccess");
         setAccessible0.invoke(getJavaLangAccess, true);
         javaLangAccess = getJavaLangAccess.invoke(null);
@@ -57,8 +60,12 @@ class InternalAccessProvider implements ClassProvider {
             final Module module = target.getModule();
             PrivilegedAction<ClassLoader> pa = module::getClassLoader;
             final ClassLoader loader = AccessController.doPrivileged(pa);
-            final Class<?> type = (Class<?>) defineClass.invoke(javaLangAccess, loader, name, bytes, null, "__Mirror__");
-            return type;
+            try {
+                return Class.forName(name, true, loader);
+            } catch (ClassNotFoundException ex) {
+                final Class<?> type = (Class<?>) defineClass.invoke(javaLangAccess, loader, name, bytes, null, "__Mirror__");
+                return type;
+            }
         } catch (InvocationTargetException | IllegalAccessException e) {
             e.printStackTrace();
             return null;
@@ -68,6 +75,7 @@ class InternalAccessProvider implements ClassProvider {
     void export(final Module module, final String namespace) {
         try {
             addExports0.invoke(null, module, namespace, LookingGlass.class.getModule());
+            addExportsToAllUnnamed0.invoke(null, module, namespace);
         } catch (InvocationTargetException | IllegalAccessException e) {
             e.printStackTrace();
             module.addExports(namespace, LookingGlass.class.getModule());

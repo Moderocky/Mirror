@@ -48,4 +48,27 @@ public interface FieldAccessor<Type> extends Window, Accessor {
         
     }
     
+    class RelayedFieldAccessor<Thing, Type> extends FieldAccessorImpl<Thing, Type> {
+        
+        private final MethodAccessor<Type> getter;
+        private final MethodAccessor<Void> setter;
+        
+        public RelayedFieldAccessor(MethodAccessor<Type> getter, MethodAccessor<Void> setter) {
+            super((Thing) Object.class); // prevents the exception being thrown by super
+            this.getter = getter;
+            this.setter = setter;
+        }
+        
+        @Override
+        public Type get() {
+            return getter.invoke();
+        }
+        
+        @Override
+        public void set(Object value) {
+            setter.invoke(value);
+        }
+        
+    }
+    
 }

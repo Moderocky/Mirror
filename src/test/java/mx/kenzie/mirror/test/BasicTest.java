@@ -78,6 +78,30 @@ public class BasicTest {
         Field obj = BasicTest.class.getDeclaredField("word");
         final BasicTest test = new BasicTest();
         
+        for (int i = 0; i < tries; i++) { // warm up reflection for charity :)
+            obj.set(test, "Goodbye");
+            obj.get(test);
+        }
+        
+        
+        final FieldAccessor<Integer> synthetic = Mirror.of(Class.class)
+            .unsafe()
+            .field("SYNTHETIC");
+        for (int i = 0; i < tries; i++) {
+            assert synthetic.get() == 0x00001000;
+        }
+        
+        get_named:
+        {
+            final long start, end;
+            start = System.nanoTime();
+            for (int i = 0; i < tries; i++) {
+                synthetic.get();
+            }
+            end = System.nanoTime();
+            System.out.println("Accessing restricted named field " + tries + " times took " + (end - start) + " nanos. (Avg. " + (end - start) / tries + ")");
+        }
+        
         reflect_set:
         {
             final long start, end;
@@ -104,7 +128,9 @@ public class BasicTest {
         }
         final Template template = Mirror.of(new BasicTest())
             .magic(Template.class);
-        assert template.blob() == 6;
+        for (int i = 0; i < tries; i++) {
+            template.blob();
+        }
         magic_invoke:
         {
             final long start, end;

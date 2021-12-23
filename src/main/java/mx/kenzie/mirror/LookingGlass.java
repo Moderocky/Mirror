@@ -1,7 +1,5 @@
 package mx.kenzie.mirror;
 
-import mx.kenzie.glass.Glass;
-import mx.kenzie.glass.Window;
 import mx.kenzie.mimic.Mimic;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
@@ -11,15 +9,18 @@ import org.objectweb.asm.Type;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.*;
 
 import static org.objectweb.asm.Opcodes.*;
 
 @SuppressWarnings({"unchecked", "Duplicates", "UnusedLabel", "TypeParameterHidesVisibleType"})
-class LookingGlass extends Glass implements ClassProvider {
+class LookingGlass implements ClassProvider {
+    protected Map<String, Class<?>> cache = new HashMap<>();
+    protected RuntimeClassLoader loader = new RuntimeClassLoader();
     
     protected ClassProvider provider;
     
@@ -34,7 +35,7 @@ class LookingGlass extends Glass implements ClassProvider {
     //region Constructor Accessor Generation
     <Thing>
     ConstructorAccessor<Thing> createAccessor(Class<?> target, Constructor<?> constructor) {
-        if (constructor == null) throw new NullPointerException("No matching constructor was found.");
+        if (constructor == null) return null;
         final String hash = "" + constructor.getName()
             .hashCode() + Objects.hash((Object[]) constructor.getParameterTypes());
         final Class<?> type;
@@ -44,14 +45,14 @@ class LookingGlass extends Glass implements ClassProvider {
             final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeConstructorAccessor(target, constructor, location);
             type = this.loadClass(target, path + ".Method_" + hash, bytecode);
-            cache.put(hash, (Class<? extends Window.WindowFrame>) type);
+            cache.put(hash, type);
             if (!(this.provider instanceof InternalAccessProvider provider)) break create;
             provider.assureAvailable(ConstructorAccessor.ConstructorAccessorImpl.class, target);
         }
         final ConstructorAccessor.ConstructorAccessorImpl<Thing> accessor = this.make(type, target);
         accessor.handle = constructor;
         accessor.modifiers = constructor.getModifiers();
-        accessor.dynamic = !this.isReachable(constructor);
+        accessor.dynamic = !isReachable(constructor);
         return accessor;
     }
     
@@ -81,7 +82,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitVarInsn(ALOAD, 1);
             visitor.visitIntInsn(BIPUSH, parameters.length);
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(ConstructorAccessor.ConstructorAccessorImpl.class), "verifyArray", "([Ljava/lang/Object;I)V", false);
-            if (this.isReachable(constructor)) {
+            if (isReachable(constructor)) {
                 visitor.visitTypeInsn(NEW, Type.getInternalName(targetType));
                 visitor.visitInsn(DUP);
             }
@@ -92,7 +93,7 @@ class LookingGlass extends Glass implements ClassProvider {
                     this.convertParameter(visitor, parameters[i], i);
                 }
             }
-            if (this.isReachable(constructor)) this.invokeSpecial(visitor, constructor);
+            if (isReachable(constructor)) this.invokeSpecial(visitor, constructor);
             else this.invokeDynamic(visitor, constructor);
             visitor.visitInsn(ARETURN);
             final int offset = this.wideIndexOffset(constructor.getParameterTypes(), constructor.getDeclaringClass());
@@ -117,7 +118,7 @@ class LookingGlass extends Glass implements ClassProvider {
         Thing,
         Return>
     MethodAccessor<Return> createAccessor(Thing target, Method method) {
-        if (method == null) throw new NullPointerException("No matching method was found.");
+        if (method == null) return null;
         final String hash = "" + method.getDeclaringClass().hashCode() + "_" + method.getName()
             .hashCode() + Objects.hash((Object[]) method.getParameterTypes());
         final Class<?> point = target instanceof Class c ? c : target.getClass();
@@ -127,15 +128,15 @@ class LookingGlass extends Glass implements ClassProvider {
             final String path = this.getExportedPackageFrom(point);
             final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeMethodAccessor(point, method, location);
-            type = this.loadClass(LookingGlass.class, path + ".Method_" + hash, bytecode);
-            cache.put(hash, (Class<? extends Window.WindowFrame>) type);
+            type = this.loadClass(this.getTargetPreference(point, method), path + ".Method_" + hash, bytecode);
+            cache.put(hash, type);
             if (!(this.provider instanceof InternalAccessProvider provider)) break create;
             provider.assureAvailable(MethodAccessor.MethodAccessorImpl.class, point);
         }
         final MethodAccessor.MethodAccessorImpl<Thing, Return> accessor = this.make(type, target);
         accessor.handle = method;
         accessor.modifiers = method.getModifiers();
-        accessor.dynamic = !this.isReachable(method);
+        accessor.dynamic = !isReachable(method);
         return accessor;
     }
     
@@ -154,7 +155,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitMaxs(2, 2);
             visitor.visitEnd();
         }
-        if (!this.isReachable(method)) this.writeBootstrapper(writer, method);
+        if (!isReachable(method)) this.writeBootstrapper(writer, method);
         this.writeInvoker(writer, method, location, targetType);
         return writer.toByteArray();
     }
@@ -183,7 +184,7 @@ class LookingGlass extends Glass implements ClassProvider {
                 this.convertParameter(visitor, parameters[i], i);
             }
         }
-        if (this.isReachable(method)) this.invokeNormal(visitor, method);
+        if (isReachable(method)) this.invokeNormal(visitor, method);
         else this.invokeDynamic(visitor, method, location);
         if (method.getReturnType().isPrimitive())
             this.box(visitor, method.getReturnType());
@@ -272,7 +273,7 @@ class LookingGlass extends Glass implements ClassProvider {
         Thing,
         Type>
     FieldAccessor<Type> createAccessor(Thing target, Field field) {
-        if (field == null) throw new NullPointerException("No matching field was found.");
+        if (field == null) return null;
         final String hash = "" + field.getDeclaringClass().hashCode() + "_" + field.getName()
             .hashCode() + field.getType().hashCode();
         final Class<?> type;
@@ -282,15 +283,15 @@ class LookingGlass extends Glass implements ClassProvider {
             final String path = this.getExportedPackageFrom(point);
             final String location = path.replace('.', '/') + "/Field_" + hash;
             final byte[] bytecode = this.writeFieldAccessor(point, field, location);
-            type = this.loadClass(point, path + ".Field_" + hash, bytecode);
-            cache.put(hash, (Class<? extends Window.WindowFrame>) type);
-            if (!(this.provider instanceof InternalAccessProvider provider)) break create;
-            provider.assureAvailable(FieldAccessor.FieldAccessorImpl.class, point);
+            if (this.provider instanceof InternalAccessProvider provider)
+                provider.assureAvailable(FieldAccessor.FieldAccessorImpl.class, point);
+            type = this.loadClass(this.getTargetPreference(point, field), path + ".Field_" + hash, bytecode);
+            cache.put(hash, type);
         }
         final FieldAccessor.FieldAccessorImpl<Thing, Type> accessor = this.make(type, target);
         accessor.handle = field;
         accessor.modifiers = field.getModifiers();
-        accessor.dynamic = !this.isReachable(field);
+        accessor.dynamic = !isReachable(field);
         accessor.type = (Class<Type>) field.getType();
         return accessor;
     }
@@ -310,7 +311,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitMaxs(2, 2);
             visitor.visitEnd();
         }
-        if (!this.isReachable(field)) this.writeBootstrapper(writer, field);
+        if (!isReachable(field)) this.writeBootstrapper(writer, field);
         setter:
         {
             final MethodVisitor visitor;
@@ -325,7 +326,7 @@ class LookingGlass extends Glass implements ClassProvider {
             visitor.visitVarInsn(ALOAD, 1);
             visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(this.getWrapperType(type)));
             if (type.isPrimitive()) this.unbox(visitor, type);
-            if (this.isReachable(field)) this.setNormal(visitor, field);
+            if (isReachable(field)) this.setNormal(visitor, field);
             else this.setDynamic(visitor, field, location);
             visitor.visitInsn(RETURN);
             final int offset = this.wideIndexOffset(field.getType());
@@ -344,7 +345,7 @@ class LookingGlass extends Glass implements ClassProvider {
                 visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
                 visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType));
             }
-            if (this.isReachable(field)) this.getNormal(visitor, field);
+            if (isReachable(field)) this.getNormal(visitor, field);
             else this.getDynamic(visitor, field, location);
             if (type.isPrimitive()) this.box(visitor, type);
             visitor.visitInsn(ARETURN);
@@ -424,12 +425,14 @@ class LookingGlass extends Glass implements ClassProvider {
     
     //region Creators
     <Template> Template make(Class<?> type, Object target) {
-        try {
-            final Constructor<Template> constructor = (Constructor<Template>) type.getConstructor(Object.class);
-            return constructor.newInstance(target);
-        } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
-            throw new IllegalStateException("An impossible state has been met during frame creation.", e);
-        }
+        final Object object = InternalAccessProvider.make(type, target);
+        return (Template) object;
+//        try {
+//            final Constructor<Template> constructor = (Constructor<Template>) type.getConstructor(Object.class);
+//            return constructor.newInstance(target);
+//        } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
+//            throw new IllegalStateException("An impossible state has been met during frame creation.", e);
+//        }
     }
     
     <Template, Thing> Template makeInlineProxy(Mirror<Thing> mirror, Class<Template> template) {
@@ -460,15 +463,17 @@ class LookingGlass extends Glass implements ClassProvider {
     //endregion
     
     //region Boilerplate
-    boolean isReachable(Object thing) {
-        if (thing instanceof Class<?> object) return Modifier.isPublic(object.getModifiers());
+    static boolean isReachable(Object thing) {
+        if (thing instanceof Class<?> object)
+            return Modifier.isPublic(object.getModifiers()) && LookingGlass.class.getModule()
+                .canRead(object.getModule());
         else if (thing instanceof Method object)
-            return Modifier.isPublic(object.getModifiers()) && this.isReachable(object.getDeclaringClass());
+            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
         else if (thing instanceof Field object)
-            return Modifier.isPublic(object.getModifiers()) && this.isReachable(object.getDeclaringClass());
+            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
         else if (thing instanceof Constructor object)
-            return Modifier.isPublic(object.getModifiers()) && this.isReachable(object.getDeclaringClass());
-        else return this.isReachable(thing.getClass());
+            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
+        else return isReachable(thing.getClass());
     }
     
     boolean verify() {
@@ -480,14 +485,19 @@ class LookingGlass extends Glass implements ClassProvider {
     }
     //endregion
     
+    public Class<?> getTargetPreference(Class<?> target, Object handle) {
+        if (LookingGlass.isReachable(target) && LookingGlass.isReachable(handle))
+            return LookingGlass.class;
+        return target;
+    }
+    
     //region Class Loaders
     @Override
     public Class<?> loadClass(Class<?> target, String name, byte[] bytes) {
-        if (getProvider() == this) return super.loadClass(name, bytes);
+        if (getProvider() == this) return loader.loadClass(name, bytes);
         else return getProvider().loadClass(target, name, bytes);
     }
     
-    @Override
     protected Class<?> loadClass(String name, byte[] bytes) {
         return this.loadClass(LookingGlass.class, name, bytes);
     }
@@ -694,7 +704,7 @@ class LookingGlass extends Glass implements ClassProvider {
     protected String getExportedPackageFrom(Class<?> place) {
         final Module module = place.getModule();
         final String namespace;
-        if (place.getPackageName().startsWith("java.lang")) namespace = "jdk.internal.reflect"; // prohibited namespace
+        if (place.getPackageName().startsWith("java.")) namespace = "jdk.internal.reflect"; // prohibited namespace
         else namespace = place.getPackageName();
         if (getProvider() instanceof InternalAccessProvider provider)
             provider.export(module, namespace);
@@ -761,6 +771,117 @@ class LookingGlass extends Glass implements ClassProvider {
             return new Handle(H_INVOKESTATIC, owner, name, descriptor, false);
         }
         
+    }
+    
+    //region Utilities
+    protected void writeMethodCall(MethodVisitor visitor, Object target, Class<?> owner, String name, String descriptor) {
+        visitor.visitMethodInsn(182, Type.getInternalName(owner), name, descriptor, false);
+    }
+    
+    private void doTypeConversion(MethodVisitor visitor, Class<?> from, Class<?> to) {
+        if (from != to) {
+            if (from != Void.TYPE && to != Void.TYPE) {
+                if (from.isPrimitive() && to.isPrimitive()) {
+                    short opcode;
+                    if (from == Float.TYPE) {
+                        if (to == Double.TYPE) {
+                            opcode = 141;
+                        } else if (to == Long.TYPE) {
+                            opcode = 140;
+                        } else {
+                            opcode = 139;
+                        }
+                    } else if (from == Double.TYPE) {
+                        if (to == Float.TYPE) {
+                            opcode = 144;
+                        } else if (to == Long.TYPE) {
+                            opcode = 143;
+                        } else {
+                            opcode = 142;
+                        }
+                    } else if (from == Long.TYPE) {
+                        if (to == Float.TYPE) {
+                            opcode = 137;
+                        } else if (to == Double.TYPE) {
+                            opcode = 138;
+                        } else {
+                            opcode = 136;
+                        }
+                    } else if (to == Float.TYPE) {
+                        opcode = 134;
+                    } else if (to == Double.TYPE) {
+                        opcode = 135;
+                    } else if (to == Byte.TYPE) {
+                        opcode = 145;
+                    } else if (to == Short.TYPE) {
+                        opcode = 147;
+                    } else if (to == Character.TYPE) {
+                        opcode = 146;
+                    } else {
+                        opcode = 133;
+                    }
+                    
+                    visitor.visitInsn(opcode);
+                } else {
+                    if (from.isPrimitive() ^ to.isPrimitive()) {
+                        String var10002 = from.getSimpleName();
+                        throw new IllegalArgumentException("Type wrapping is currently unsupported due to side-effects: '" + var10002 + "' -> '" + to.getSimpleName() + "'");
+                    }
+                    
+                    visitor.visitTypeInsn(192, Type.getInternalName(to));
+                }
+                
+            }
+        }
+    }
+    
+    protected int wideIndexOffset(Class<?>[] params, Class<?> ret) {
+        int i = 0;
+        Class[] var4 = params;
+        int var5 = params.length;
+        
+        for (int var6 = 0; var6 < var5; ++var6) {
+            Class<?> param = var4[var6];
+            i += this.wideIndexOffset(param);
+        }
+        
+        return Math.max(i, this.wideIndexOffset(ret));
+    }
+    
+    protected int wideIndexOffset(Class<?> thing) {
+        return thing != Long.TYPE && thing != Double.TYPE ? 0 : 1;
+    }
+    
+    private int instructionOffset(Class<?> type) {
+        if (type == Integer.TYPE) {
+            return 1;
+        } else if (type == Long.TYPE) {
+            return 2;
+        } else if (type == Float.TYPE) {
+            return 3;
+        } else if (type == Double.TYPE) {
+            return 4;
+        } else {
+            return type == Void.TYPE ? 6 : 5;
+        }
+    }
+    //endregion
+    
+    static class RuntimeClassLoader extends ClassLoader {
+        public RuntimeClassLoader(String name, ClassLoader parent) {
+            super(name, parent);
+        }
+        
+        public RuntimeClassLoader(ClassLoader parent) {
+            super(parent);
+        }
+        
+        public RuntimeClassLoader() {
+        }
+        
+        public Class<?> loadClass(String name, byte[] bytecode) {
+            return this.defineClass(name, bytecode, 0, bytecode.length);
+        }
     }
     
 }

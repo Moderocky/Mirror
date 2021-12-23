@@ -39,6 +39,12 @@ public class FieldAccessorTest {
         assert !accessor.isDynamicAccess();
         accessor.set(66);
         assert (int) accessor.get() == 66;
+        try {
+            assert Mirror.of(System.class).field("out") != null;
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            ex.getCause().printStackTrace();
+        }
     }
     
     @Test

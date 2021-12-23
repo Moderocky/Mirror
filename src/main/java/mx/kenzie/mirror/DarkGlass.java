@@ -76,7 +76,7 @@ final class DarkGlass extends LookingGlass {
                 this.convertParameter(visitor, parameters[i], i);
             }
         }
-        if (this.isReachable(method)) this.invokeNormal(visitor, method);
+        if (isReachable(method)) this.invokeNormal(visitor, method);
         else this.invokeDynamic(visitor, method);
         if (method.getReturnType().isPrimitive())
             this.box(visitor, method.getReturnType());
@@ -110,7 +110,7 @@ final class DarkGlass extends LookingGlass {
             visitor.visitMaxs(2, 2);
             visitor.visitEnd();
         }
-        if (!this.isReachable(method)) this.writeBootstrapper(writer, method);
+        if (!isReachable(method)) this.writeBootstrapper(writer, method);
         invoker:
         // can't super the invoker since we need to use local bootstrap
         {
@@ -131,7 +131,7 @@ final class DarkGlass extends LookingGlass {
                     this.convertParameter(visitor, parameters[i], i);
                 }
             }
-            if (this.isReachable(method)) this.invokeNormal(visitor, method);
+            if (isReachable(method)) this.invokeNormal(visitor, method);
             else this.invokeDynamic(visitor, method, location);
             if (method.getReturnType().isPrimitive())
                 this.box(visitor, method.getReturnType());
@@ -203,7 +203,7 @@ final class DarkGlass extends LookingGlass {
             visitor.visitMaxs(2, 2);
             visitor.visitEnd();
         }
-        if (!this.isReachable(field)) this.writeBootstrapper(writer, field);
+        if (!isReachable(field)) this.writeBootstrapper(writer, field);
         setter:
         {
             final MethodVisitor visitor;
@@ -216,7 +216,7 @@ final class DarkGlass extends LookingGlass {
             visitor.visitVarInsn(ALOAD, 1);
             visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(this.getWrapperType(type)));
             if (type.isPrimitive()) this.unbox(visitor, type);
-            if (this.isReachable(field)) this.setNormal(visitor, field);
+            if (isReachable(field)) this.setNormal(visitor, field);
             else this.setDynamic(visitor, field, location);
             visitor.visitInsn(RETURN);
             final int offset = this.wideIndexOffset(field.getType());
@@ -233,7 +233,7 @@ final class DarkGlass extends LookingGlass {
             visitor.visitVarInsn(ALOAD, 0);
             visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
             visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType));
-            if (this.isReachable(field)) this.getNormal(visitor, field);
+            if (isReachable(field)) this.getNormal(visitor, field);
             else this.getDynamic(visitor, field, location);
             if (type.isPrimitive()) this.box(visitor, type);
             visitor.visitInsn(ARETURN);

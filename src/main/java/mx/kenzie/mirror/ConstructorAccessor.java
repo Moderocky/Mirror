@@ -1,11 +1,9 @@
 package mx.kenzie.mirror;
 
-import mx.kenzie.glass.Window;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 
-public interface ConstructorAccessor<Type> extends Window, Accessor, ExecutableAccessor<Type, Constructor<Type>> {
+public interface ConstructorAccessor<Type> extends Accessor, ExecutableAccessor<Type, Constructor<Type>> {
     
     default Type newInstance(Object... arguments) {
         return this.invoke(arguments);
@@ -15,14 +13,22 @@ public interface ConstructorAccessor<Type> extends Window, Accessor, ExecutableA
     
     Constructor<Type> reflect();
     
-    abstract class ConstructorAccessorImpl<Type> extends WindowFrame implements ConstructorAccessor<Type> {
+    Object getTarget();
+    
+    Class<?> getTargetType();
+    
+    abstract class ConstructorAccessorImpl<Type> implements ConstructorAccessor<Type> {
         
         protected int modifiers;
         protected boolean dynamic;
         public Constructor<?> handle;
         
+        protected Object target;
+        protected final Class<?> targetType;
+        
         public ConstructorAccessorImpl(Type target) {
-            super(target);
+            this.target = target;
+            this.targetType = target.getClass();
         }
         
         protected void verifyArray(Object[] objects, int length) {
@@ -52,6 +58,16 @@ public interface ConstructorAccessor<Type> extends Window, Accessor, ExecutableA
         
         public Constructor<Type> reflect() {
             return (Constructor<Type>) handle;
+        }
+        
+        @Override
+        public Object getTarget() {
+            return target;
+        }
+        
+        @Override
+        public Class<?> getTargetType() {
+            return targetType;
         }
     }
     

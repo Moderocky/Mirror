@@ -170,6 +170,14 @@ public class Mirror<Thing> {
         return target.getClass();
     }
     
+    protected Class<?> loadClass(String name, byte[] bytecode) {
+        return glass.loadClass(name, bytecode);
+    }
+    
+    protected Class<?> loadClass(Class<?> target, String name, byte[] bytecode) {
+        return glass.loadClass(target, name, bytecode);
+    }
+    
     @TestOnly
     protected byte[] retrieveCode(final Accessor object) {
         if (object instanceof FieldAccessor<?> accessor)

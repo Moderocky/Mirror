@@ -87,7 +87,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         final String name = method.getName().substring(1);
         final Field target = mirror.findField(name);
         if (target == null) return;
-        if (!mirror.glass.isReachable(target)) this.writeBootstrapper(writer, target);
+        if (!LookingGlass.isReachable(target)) this.writeBootstrapper(writer, target);
         final MethodVisitor visitor = writer.visitMethod(1 | 16 | 4096, method.getName(), Type.getMethodDescriptor(method), null, null);
         visitor.visitCode();
         if (method.getParameterCount() > 0) {
@@ -99,7 +99,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
             visitor.visitVarInsn(20 + instructionOffset(type), 1);
             if (type != target.getType() && !type.isPrimitive() && !target.getType().isPrimitive())
                 visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(target.getType()));
-            if (mirror.glass.isReachable(target)) mirror.glass.setNormal(visitor, target);
+            if (LookingGlass.isReachable(target)) mirror.glass.setNormal(visitor, target);
             else mirror.glass.setDynamic(visitor, target, internal);
         }
         if (method.getReturnType() == void.class) {
@@ -109,7 +109,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
                 visitor.visitVarInsn(ALOAD, 0);
                 visitor.visitFieldInsn(GETFIELD, internal, "target", mirror.emergentClass().descriptorString());
             }
-            if (mirror.glass.isReachable(target)) mirror.glass.getNormal(visitor, target);
+            if (LookingGlass.isReachable(target)) mirror.glass.getNormal(visitor, target);
             else mirror.glass.getDynamic(visitor, target, internal);
             visitor.visitInsn(171 + instructionOffset(method.getReturnType()));
         }
@@ -124,7 +124,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         final Method target = mirror.findMethod(method.getName(), method.getParameterTypes());
         if (target == null && method.getName().startsWith("$")) this.writeFieldCaller(method);
         if (target == null) return;
-        if (!mirror.glass.isReachable(target)) this.writeBootstrapper(writer, target);
+        if (!LookingGlass.isReachable(target)) this.writeBootstrapper(writer, target);
         final MethodVisitor visitor = writer.visitMethod(1 | 16 | 4096, method.getName(), Type.getMethodDescriptor(method), null, null);
         visitor.visitCode();
         if (!Modifier.isStatic(target.getModifiers())) {
@@ -136,7 +136,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
             visitor.visitVarInsn(20 + instructionOffset(type), ++index);
             if (type == long.class || type == double.class) index++;
         }
-        if (mirror.glass.isReachable(target)) mirror.glass.invokeNormal(visitor, target);
+        if (LookingGlass.isReachable(target)) mirror.glass.invokeNormal(visitor, target);
         else mirror.glass.invokeDynamic(visitor, target, internal);
         if (method.getReturnType() == void.class && target.getReturnType() == void.class) {
             visitor.visitInsn(RETURN);

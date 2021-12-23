@@ -14,6 +14,7 @@ class InternalAccessProvider implements ClassProvider {
     final Object javaLangAccess;
     final Unsafe unsafe;
     final Method defineClass;
+    final Method addReads0;
     final Method addExports0;
     final Method addExportsToAllUnnamed0;
     final Method newInstanceWithCaller;
@@ -32,6 +33,8 @@ class InternalAccessProvider implements ClassProvider {
         setAccessible0.setAccessible(true);
         final Method implAddExportsOrOpens = Module.class.getDeclaredMethod("implAddExportsOrOpens", String.class, Module.class, boolean.class, boolean.class);
         setAccessible0.invoke(implAddExportsOrOpens, true);
+        addReads0 = Module.class.getDeclaredMethod("addReads0", Module.class, Module.class);
+        setAccessible0.invoke(addReads0, true);
         addExports0 = Module.class.getDeclaredMethod("addExports0", Module.class, String.class, Module.class);
         setAccessible0.invoke(addExports0, true);
         addExportsToAllUnnamed0 = Module.class.getDeclaredMethod("addExportsToAllUnnamed0", Module.class, String.class);
@@ -44,6 +47,16 @@ class InternalAccessProvider implements ClassProvider {
         setAccessible0.invoke(defineClass, true);
         newInstanceWithCaller = Constructor.class.getDeclaredMethod("newInstanceWithCaller", Object[].class, boolean.class, Class.class);
         setAccessible0.invoke(newInstanceWithCaller, true);
+    }
+    
+    public static Object make(Class<?> type, Object target) {
+        try {
+            final Constructor<?> constructor = type.getConstructor(Object.class);
+            return constructor.newInstance(target);
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            return null;
+        }
     }
     
     Class<?> findClass(Class<?> target, String name) {
@@ -63,7 +76,9 @@ class InternalAccessProvider implements ClassProvider {
     @Override
     public Class<?> loadClass(Class<?> target, String name, byte[] bytes) {
         try {
-            final ClassLoader loader = this.getClassLoader(target.getModule());
+            final ClassLoader loader;
+            if (target.getClassLoader() != null) loader = target.getClassLoader();
+            else loader = this.getClassLoader(target.getModule());
             try {
                 return Class.forName(name, true, loader);
             } catch (ClassNotFoundException ex) {
@@ -76,14 +91,19 @@ class InternalAccessProvider implements ClassProvider {
     
     void assureAvailable(Class<?> resource, Class<?> target) {
         if (resource == null) return;
-        if (resource.getSuperclass() != Object.class && resource.getSuperclass() != Class.class)
-            this.assureAvailable(resource.getSuperclass(), target);
         for (final Class<?> template : resource.getInterfaces()) {
             this.assureAvailable(template, target);
         }
+        if (resource.getSuperclass() != Object.class && resource.getSuperclass() != Class.class)
+            this.assureAvailable(resource.getSuperclass(), target);
+        final ClassLoader loader;
+        if (target.getClassLoader() != null) loader = target.getClassLoader();
+        else loader = this.getClassLoader(target.getModule());
         try {
-            Class.forName(resource.getName(), true, this.getClassLoader(target.getModule()));
+            Class.forName(resource.getName(), true, loader);
         } catch (ClassNotFoundException ex) {
+            this.addReads(target.getModule(), resource.getModule());
+            this.addReads(target.getModule(), null);
             final byte[] bytecode = this.getSource(Type.getInternalName(resource));
             if (bytecode.length == 0) return;
             this.loadClass(target, resource.getName(), bytecode);
@@ -96,6 +116,14 @@ class InternalAccessProvider implements ClassProvider {
             return stream.readAllBytes();
         } catch (IOException ex) {
             return new byte[0];
+        }
+    }
+    
+    void addReads(final Module reader, final Module target) {
+        try {
+            addReads0.invoke(null, reader, target);
+        } catch (InvocationTargetException | IllegalAccessException e) {
+            reader.addReads(target);
         }
     }
     

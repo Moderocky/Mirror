@@ -1,11 +1,9 @@
 package mx.kenzie.mirror;
 
-import mx.kenzie.glass.Window;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-public interface FieldAccessor<Type> extends Window, Accessor {
+public interface FieldAccessor<Type> extends Accessor {
     
     Type get();
     
@@ -17,15 +15,23 @@ public interface FieldAccessor<Type> extends Window, Accessor {
         return Mirror.of(get());
     }
     
-    abstract class FieldAccessorImpl<Thing, Type> extends WindowFrame implements FieldAccessor<Type> {
+    Object getTarget();
+    
+    Class<?> getTargetType();
+    
+    abstract class FieldAccessorImpl<Thing, Type> implements FieldAccessor<Type> {
         
         protected int modifiers;
         protected boolean dynamic;
         protected Class<Type> type;
         public Field handle;
         
+        protected Object target;
+        protected final Class<?> targetType;
+        
         public FieldAccessorImpl(Thing target) {
-            super(target);
+            this.target = target;
+            this.targetType = target.getClass();
         }
         
         @Override
@@ -52,6 +58,16 @@ public interface FieldAccessor<Type> extends Window, Accessor {
         
         public Field reflect() {
             return handle;
+        }
+        
+        @Override
+        public Object getTarget() {
+            return target;
+        }
+        
+        @Override
+        public Class<?> getTargetType() {
+            return targetType;
         }
     }
     

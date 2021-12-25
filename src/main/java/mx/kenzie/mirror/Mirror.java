@@ -114,6 +114,20 @@ public class Mirror<Thing> {
     }
     
     /**
+     * Obtain a method accessor.
+     *
+     * @param name      the method name
+     * @param arguments the method arguments
+     * @param <Return>  the return type of this method
+     * @return the method accessor
+     */
+    public <Return> MethodAccessor<Return> method(String name, Object... arguments) {
+        if (target instanceof Class<?> type)
+            return glass.createAccessor(target, glass.findSmartMethod(type, name, arguments));
+        return glass.createAccessor(target, glass.findSmartMethod(target.getClass(), name, arguments));
+    }
+    
+    /**
      * Obtain a method accessor from a method object.
      *
      * @param method   the method

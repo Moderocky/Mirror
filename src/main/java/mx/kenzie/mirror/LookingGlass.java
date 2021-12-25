@@ -241,6 +241,31 @@ class LookingGlass implements ClassProvider {
         }
     }
     
+    Method findSmartMethod(Class<?> target, String name, Object... arguments) {
+        final int length = arguments.length;
+        final Class<?>[] args = new Class[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            args[i] = arguments[i].getClass();
+        }
+        for (final Method method : target.getDeclaredMethods()) {
+            if (method.getParameterCount() != length) continue;
+            if (!method.getName().equals(name)) continue;
+            if (!Arrays.equals(args, method.getParameterTypes())) return method;
+        }
+        for (final Method method : target.getDeclaredMethods())
+            check_params:{
+                if (method.getParameterCount() != length) continue;
+                if (!method.getName().equals(name)) continue;
+                final Class<?>[] parameters = method.getParameterTypes();
+                for (int i = 0; i < args.length; i++) {
+                    if (!parameters[i].isAssignableFrom(args[i])) break check_params;
+                }
+                return method;
+            }
+        if (target == Object.class) return null;
+        return findSmartMethod(target.getSuperclass(), name, arguments);
+    }
+    
     Method findMethod(Class<?> target, String name, Class<?>... parameters) {
         try {
             return target.getDeclaredMethod(name, parameters);

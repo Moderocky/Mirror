@@ -24,12 +24,17 @@ class LookingGlass implements ClassProvider {
     
     protected ClassProvider provider;
     
-    {
+    public LookingGlass() {
         try {
             provider = new InternalAccessProvider();
         } catch (Throwable ex) {
-            provider = null;
+            provider = this;
         }
+    }
+    
+    public LookingGlass(ClassProvider provider) {
+        if (provider != null) this.provider = provider;
+        else this.provider = this;
     }
     
     //region Constructor Accessor Generation
@@ -40,7 +45,7 @@ class LookingGlass implements ClassProvider {
             .hashCode() + Objects.hash((Object[]) constructor.getParameterTypes());
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
-        else create:{
+        else create: {
             final String path = this.getExportedPackageFrom(target);
             final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeConstructorAccessor(target, constructor, location);
@@ -263,6 +268,10 @@ class LookingGlass implements ClassProvider {
                 return method;
             }
         if (target == Object.class) return null;
+        for (final Class<?> template : target.getInterfaces()) {
+            final Method found = findSmartMethod(template, name, arguments);
+            if (found != null) return found;
+        }
         return findSmartMethod(target.getSuperclass(), name, arguments);
     }
     

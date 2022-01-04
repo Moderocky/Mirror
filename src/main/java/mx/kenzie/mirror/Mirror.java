@@ -18,10 +18,26 @@ public class Mirror<Thing> {
     
     protected final Thing target;
     protected LookingGlass glass;
+    protected ClassLoader loader;
     
     protected Mirror(Thing target) {
         this.target = target;
         this.glass = GLASS;
+        this.loader = Mirror.class.getClassLoader();
+    }
+    
+    public Mirror<Thing> useProvider(ClassProvider provider) {
+        this.glass = new LookingGlass(provider);
+        return this;
+    }
+    
+    public Mirror<Thing> setLoader(ClassLoader loader) {
+        this.loader = loader;
+        return this;
+    }
+    
+    public ClassLoader getLoader() {
+        return loader;
     }
     
     /**

@@ -43,20 +43,15 @@
 
     <distributionManagement>
         <repository>
-            <id>pan-repo</id>
-            <url>https://gitlab.com/api/v4/projects/18568066/packages/maven</url>
+            <id>kenzie</id>
+            <url>https://repo.kenzie.mx/releases</url>
         </repository>
-        <snapshotRepository>
-            <id>pan-repo</id>
-            <url>https://gitlab.com/api/v4/projects/18568066/packages/maven</url>
-        </snapshotRepository>
     </distributionManagement>
 
     <repositories>
         <repository>
-            <id>pan-repo</id>
-            <name>Pandaemonium Repository</name>
-            <url>https://gitlab.com/api/v4/projects/18568066/packages/maven</url>
+            <id>kenzie</id>
+            <url>https://repo.kenzie.mx/releases</url>
         </repository>
     </repositories>
 

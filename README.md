@@ -11,9 +11,9 @@ Version 5 of Mirror abandoned trying to shortcut the JDK's reflection API and in
 ## Maven Information
 ```xml
 <repository>
-    <id>pan-repo</id>
-    <name>Pandaemonium Repository</name>
-    <url>https://gitlab.com/api/v4/projects/18568066/packages/maven</url>
+    <id>kenzie</id>
+    <name>Kenzie's Repository</name>
+    <url>https://repo.kenzie.mx/releases</url>
 </repository>
 ``` 
 
@@ -21,7 +21,7 @@ Version 5 of Mirror abandoned trying to shortcut the JDK's reflection API and in
 <dependency>
     <groupId>mx.kenzie</groupId>
     <artifactId>mirror</artifactId>
-    <version>5.0.0</version>
+    <version>5.0.3</version>
     <scope>compile</scope>
 </dependency>
 ```

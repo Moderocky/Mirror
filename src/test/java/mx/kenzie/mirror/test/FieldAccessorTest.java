@@ -7,10 +7,10 @@ import org.junit.Test;
 
 public class FieldAccessorTest {
     
-    public int a;
     public static int b;
-    private int c;
     private static int d;
+    public int a;
+    private int c;
     
     @BeforeClass
     public static void warmUp() {

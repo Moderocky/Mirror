@@ -12,20 +12,20 @@ public class MagicMirrorTest {
     @SuppressWarnings("all")
     private int d = 4;
     
-    private int blob() {
-        return 6;
-    }
-    
     private static int bean(int i) {
         return i + 2;
     }
     
-    public String name() {
-        return "Hello";
-    }
-    
     public static int box(long l) {
         return (int) l;
+    }
+    
+    private int blob() {
+        return 6;
+    }
+    
+    public String name() {
+        return "Hello";
     }
     
     @Test

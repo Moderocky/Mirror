@@ -11,20 +11,8 @@ public class MethodAccessorTest {
         return i + 1;
     }
     
-    private int bar(int i) {
-        return i + 2;
-    }
-    
     public static int foo(int i, int j) {
         return i + j;
-    }
-    
-    public int bar(int i, int j) {
-        return i + j;
-    }
-    
-    private int test() {
-        return 1;
     }
     
     @BeforeClass
@@ -34,6 +22,18 @@ public class MethodAccessorTest {
         mirror.method("foo", int.class, int.class).invoke(0, 0);
         mirror.method("bar", int.class).invoke(0);
         mirror.method("bar", int.class, int.class).invoke(0, 0);
+    }
+    
+    private int bar(int i) {
+        return i + 2;
+    }
+    
+    public int bar(int i, int j) {
+        return i + j;
+    }
+    
+    private int test() {
+        return 1;
     }
     
     @Test

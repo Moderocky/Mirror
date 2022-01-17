@@ -5,40 +5,32 @@ import java.lang.reflect.Modifier;
 
 public interface FieldAccessor<Type> extends Accessor {
     
-    Type get();
-    
     void set(Object value);
     
     Field reflect();
+    
+    Class<?> getTargetType();
     
     default Mirror<Type> mirror() {
         return Mirror.of(get());
     }
     
-    Object getTarget();
+    Type get();
     
-    Class<?> getTargetType();
+    Object getTarget();
     
     abstract class FieldAccessorImpl<Thing, Type> implements FieldAccessor<Type> {
         
+        protected final Class<?> targetType;
+        public Field handle;
         protected int modifiers;
         protected boolean dynamic;
         protected Class<Type> type;
-        public Field handle;
-        
         protected Object target;
-        protected final Class<?> targetType;
         
         public FieldAccessorImpl(Thing target) {
             this.target = target;
             this.targetType = target.getClass();
-        }
-        
-        @Override
-        public void setTarget(Object target) {
-            if (!targetType.isAssignableFrom(target.getClass()))
-                throw new IllegalArgumentException("New target must be of a compatible type.");
-            this.target = target;
         }
         
         @Override
@@ -63,6 +55,13 @@ public interface FieldAccessor<Type> extends Accessor {
         @Override
         public Object getTarget() {
             return target;
+        }
+        
+        @Override
+        public void setTarget(Object target) {
+            if (!targetType.isAssignableFrom(target.getClass()))
+                throw new IllegalArgumentException("New target must be of a compatible type.");
+            this.target = target;
         }
         
         @Override

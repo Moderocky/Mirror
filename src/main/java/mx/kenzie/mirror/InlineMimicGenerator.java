@@ -14,8 +14,8 @@ import static org.objectweb.asm.Opcodes.*;
 
 class InlineMimicGenerator extends MimicGenerator {
     
-    protected List<MethodAccessor<?>> accessors = new ArrayList<>();
     protected final Mirror<?> mirror;
+    protected List<MethodAccessor<?>> accessors = new ArrayList<>();
     
     protected InlineMimicGenerator(String location, Class<?> top, Mirror<?> mirror) {
         super(location, top);

@@ -16,12 +16,11 @@ public interface MethodAccessor<Return> extends ExecutableAccessor<Return, Metho
     
     abstract class MethodAccessorImpl<Thing, Return> implements MethodAccessor<Return> {
         
+        protected final Class<?> targetType;
+        public Method handle;
         protected int modifiers;
         protected boolean dynamic;
-        public Method handle;
-        
         protected Object target;
-        protected final Class<?> targetType;
         
         public MethodAccessorImpl(Thing target) {
             this.target = target;
@@ -31,13 +30,6 @@ public interface MethodAccessor<Return> extends ExecutableAccessor<Return, Metho
         protected void verifyArray(Object[] objects, int length) {
             if (objects.length < length)
                 throw new IllegalArgumentException("Parameter count " + objects.length + " is lower than required " + length);
-        }
-        
-        @Override
-        public void setTarget(Object target) {
-            if (!targetType.isAssignableFrom(target.getClass()))
-                throw new IllegalArgumentException("New target must be of a compatible type.");
-            this.target = target;
         }
         
         @Override
@@ -63,6 +55,13 @@ public interface MethodAccessor<Return> extends ExecutableAccessor<Return, Metho
         @Override
         public Object getTarget() {
             return target;
+        }
+        
+        @Override
+        public void setTarget(Object target) {
+            if (!targetType.isAssignableFrom(target.getClass()))
+                throw new IllegalArgumentException("New target must be of a compatible type.");
+            this.target = target;
         }
         
         @Override

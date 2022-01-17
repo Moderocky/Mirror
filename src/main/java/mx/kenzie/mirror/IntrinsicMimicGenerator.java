@@ -65,22 +65,41 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         return writer.toByteArray();
     }
     
-    private void writeBootstrapper(ClassWriter writer, Method method) {
-        final boolean dynamic = !Modifier.isStatic(method.getModifiers());
-        if (dynamic && hasDynamicMethodBootstrap) return;
-        else if (!dynamic && hasStaticMethodBootstrap) return;
-        if (dynamic) hasDynamicMethodBootstrap = true;
-        else hasStaticMethodBootstrap = true;
-        mirror.glass.writeBootstrapper(writer, method);
-    }
-    
-    private void writeBootstrapper(ClassWriter writer, Field field) {
-        final boolean dynamic = !Modifier.isStatic(field.getModifiers());
-        if (dynamic && hasDynamicFieldBootstrap) return;
-        else if (!dynamic && hasStaticFieldBootstrap) return;
-        if (dynamic) hasDynamicFieldBootstrap = true;
-        else hasStaticFieldBootstrap = true;
-        mirror.glass.writeBootstrapper(writer, field);
+    @Override
+    protected void writeCaller(Method method) {
+        final Method target = mirror.findMethod(method.getName(), method.getParameterTypes());
+        if (target == null && method.getName().startsWith("$")) this.writeFieldCaller(method);
+        if (target == null) return;
+        if (!LookingGlass.isReachable(target)) this.writeBootstrapper(writer, target);
+        final MethodVisitor visitor = writer.visitMethod(1 | 16 | 4096, method.getName(), Type.getMethodDescriptor(method), null, null);
+        visitor.visitCode();
+        if (!Modifier.isStatic(target.getModifiers())) {
+            visitor.visitVarInsn(ALOAD, 0);
+            visitor.visitFieldInsn(GETFIELD, internal, "target", mirror.emergentClass().descriptorString());
+        }
+        int index = 0;
+        for (Class<?> type : target.getParameterTypes()) {
+            visitor.visitVarInsn(20 + instructionOffset(type), ++index);
+            if (type == long.class || type == double.class) index++;
+        }
+        if (LookingGlass.isReachable(target)) mirror.glass.invokeNormal(visitor, target);
+        else mirror.glass.invokeDynamic(visitor, target, internal);
+        if (method.getReturnType() == void.class && target.getReturnType() == void.class) {
+            visitor.visitInsn(RETURN);
+        } else if (method.getReturnType() == void.class) {
+            visitor.visitInsn(POP);
+            visitor.visitInsn(RETURN);
+        } else if (target.getReturnType() == method.getReturnType()) {
+            visitor.visitInsn(171 + instructionOffset(method.getReturnType()));
+        } else {
+            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(getWrapperType(method.getReturnType())));
+            this.unbox(visitor, method.getReturnType());
+            visitor.visitInsn(171 + instructionOffset(method.getReturnType()));
+        }
+        final int offset = Math.max(this.wideIndexOffset(method.getParameterTypes(), method.getReturnType()), this.wideIndexOffset(target.getParameterTypes(), target.getReturnType()));
+        final int size = 1 + target.getParameterCount() + offset;
+        visitor.visitMaxs(size, size);
+        visitor.visitEnd();
     }
     
     protected void writeFieldCaller(Method method) {
@@ -119,41 +138,22 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         visitor.visitEnd();
     }
     
-    @Override
-    protected void writeCaller(Method method) {
-        final Method target = mirror.findMethod(method.getName(), method.getParameterTypes());
-        if (target == null && method.getName().startsWith("$")) this.writeFieldCaller(method);
-        if (target == null) return;
-        if (!LookingGlass.isReachable(target)) this.writeBootstrapper(writer, target);
-        final MethodVisitor visitor = writer.visitMethod(1 | 16 | 4096, method.getName(), Type.getMethodDescriptor(method), null, null);
-        visitor.visitCode();
-        if (!Modifier.isStatic(target.getModifiers())) {
-            visitor.visitVarInsn(ALOAD, 0);
-            visitor.visitFieldInsn(GETFIELD, internal, "target", mirror.emergentClass().descriptorString());
-        }
-        int index = 0;
-        for (Class<?> type : target.getParameterTypes()) {
-            visitor.visitVarInsn(20 + instructionOffset(type), ++index);
-            if (type == long.class || type == double.class) index++;
-        }
-        if (LookingGlass.isReachable(target)) mirror.glass.invokeNormal(visitor, target);
-        else mirror.glass.invokeDynamic(visitor, target, internal);
-        if (method.getReturnType() == void.class && target.getReturnType() == void.class) {
-            visitor.visitInsn(RETURN);
-        } else if (method.getReturnType() == void.class) {
-            visitor.visitInsn(POP);
-            visitor.visitInsn(RETURN);
-        } else if (target.getReturnType() == method.getReturnType()) {
-            visitor.visitInsn(171 + instructionOffset(method.getReturnType()));
-        } else {
-            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(getWrapperType(method.getReturnType())));
-            this.unbox(visitor, method.getReturnType());
-            visitor.visitInsn(171 + instructionOffset(method.getReturnType()));
-        }
-        final int offset = Math.max(this.wideIndexOffset(method.getParameterTypes(), method.getReturnType()), this.wideIndexOffset(target.getParameterTypes(), target.getReturnType()));
-        final int size = 1 + target.getParameterCount() + offset;
-        visitor.visitMaxs(size, size);
-        visitor.visitEnd();
+    private void writeBootstrapper(ClassWriter writer, Method method) {
+        final boolean dynamic = !Modifier.isStatic(method.getModifiers());
+        if (dynamic && hasDynamicMethodBootstrap) return;
+        else if (!dynamic && hasStaticMethodBootstrap) return;
+        if (dynamic) hasDynamicMethodBootstrap = true;
+        else hasStaticMethodBootstrap = true;
+        mirror.glass.writeBootstrapper(writer, method);
+    }
+    
+    private void writeBootstrapper(ClassWriter writer, Field field) {
+        final boolean dynamic = !Modifier.isStatic(field.getModifiers());
+        if (dynamic && hasDynamicFieldBootstrap) return;
+        else if (!dynamic && hasStaticFieldBootstrap) return;
+        if (dynamic) hasDynamicFieldBootstrap = true;
+        else hasStaticFieldBootstrap = true;
+        mirror.glass.writeBootstrapper(writer, field);
     }
     
 }

@@ -13,18 +13,17 @@ public interface ConstructorAccessor<Type> extends Accessor, ExecutableAccessor<
     
     Constructor<Type> reflect();
     
-    Object getTarget();
-    
     Class<?> getTargetType();
+    
+    Object getTarget();
     
     abstract class ConstructorAccessorImpl<Type> implements ConstructorAccessor<Type> {
         
+        protected final Class<?> targetType;
+        public Constructor<?> handle;
         protected int modifiers;
         protected boolean dynamic;
-        public Constructor<?> handle;
-        
         protected Object target;
-        protected final Class<?> targetType;
         
         public ConstructorAccessorImpl(Type target) {
             this.target = target;
@@ -34,11 +33,6 @@ public interface ConstructorAccessor<Type> extends Accessor, ExecutableAccessor<
         protected void verifyArray(Object[] objects, int length) {
             if (objects.length < length)
                 throw new IllegalArgumentException("");
-        }
-        
-        @Override
-        public void setTarget(Object target) {
-            this.target = target;
         }
         
         @Override
@@ -63,6 +57,11 @@ public interface ConstructorAccessor<Type> extends Accessor, ExecutableAccessor<
         @Override
         public Object getTarget() {
             return target;
+        }
+        
+        @Override
+        public void setTarget(Object target) {
+            this.target = target;
         }
         
         @Override

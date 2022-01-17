@@ -1,6 +1,5 @@
 package mx.kenzie.mirror;
 
-import mx.kenzie.mimic.Mimic;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
@@ -19,9 +18,9 @@ import static org.objectweb.asm.Opcodes.*;
 
 @SuppressWarnings({"unchecked", "Duplicates", "UnusedLabel", "TypeParameterHidesVisibleType"})
 class LookingGlass implements ClassProvider {
+    private static volatile int counter;
     protected Map<String, Class<?>> cache = new HashMap<>();
     protected RuntimeClassLoader loader = new RuntimeClassLoader();
-    
     protected ClassProvider provider;
     
     public LookingGlass() {
@@ -37,6 +36,20 @@ class LookingGlass implements ClassProvider {
         else this.provider = this;
     }
     
+    //region Boilerplate
+    static boolean isReachable(Object thing) {
+        if (thing instanceof Class<?> object)
+            return Modifier.isPublic(object.getModifiers()) && LookingGlass.class.getModule()
+                .canRead(object.getModule());
+        else if (thing instanceof Method object)
+            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
+        else if (thing instanceof Field object)
+            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
+        else if (thing instanceof Constructor object)
+            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
+        else return isReachable(thing.getClass());
+    }
+    
     //region Constructor Accessor Generation
     <Thing>
     ConstructorAccessor<Thing> createAccessor(Class<?> target, Constructor<?> constructor) {
@@ -45,7 +58,7 @@ class LookingGlass implements ClassProvider {
             .hashCode() + Objects.hash((Object[]) constructor.getParameterTypes());
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
-        else create: {
+        else create:{
             final String path = this.getExportedPackageFrom(target);
             final String location = path.replace('.', '/') + "/Method_" + hash;
             final byte[] bytecode = this.writeConstructorAccessor(target, constructor, location);
@@ -60,6 +73,7 @@ class LookingGlass implements ClassProvider {
         accessor.dynamic = !isReachable(constructor);
         return accessor;
     }
+    //endregion
     
     byte[] writeConstructorAccessor(Class<?> targetType, Constructor<?> constructor, String location) {
         final ClassWriter writer = new ClassWriter(0);
@@ -116,7 +130,6 @@ class LookingGlass implements ClassProvider {
             return null;
         }
     }
-    //endregion
     
     //region Method Accessor Generation
     <
@@ -245,6 +258,7 @@ class LookingGlass implements ClassProvider {
             visitor.visitInvokeDynamicInsn(method.getName(), Type.getMethodDescriptor(method), bootstrap, Type.getType(method.getDeclaringClass()));
         }
     }
+    //endregion
     
     Method findSmartMethod(Class<?> target, String name, Object... arguments) {
         final int length = arguments.length;
@@ -285,7 +299,6 @@ class LookingGlass implements ClassProvider {
             return null;
         }
     }
-    //endregion
     
     void invokeDynamic(MethodVisitor visitor, Method method, String owner) {
         final boolean dynamic = !Modifier.isStatic(method.getModifiers());
@@ -414,6 +427,7 @@ class LookingGlass implements ClassProvider {
             visitor.visitFieldInsn(GETFIELD, Type.getInternalName(field.getDeclaringClass()), field.getName(), Type.getDescriptor(field.getType()));
         }
     }
+    //endregion
     
     void getDynamic(MethodVisitor visitor, Field field) {
         final Handle bootstrap = Handles.getBootstrap(field, false);
@@ -435,7 +449,6 @@ class LookingGlass implements ClassProvider {
             return null;
         }
     }
-    //endregion
     
     void getDynamic(MethodVisitor visitor, Field field, String owner) {
         final boolean dynamic = !Modifier.isStatic(field.getModifiers());
@@ -478,9 +491,14 @@ class LookingGlass implements ClassProvider {
         } else {
             name = InlineMimicGenerator.getStrictPackageName(template);
         }
-        return (new InlineMimicGenerator(name.replace('.', '/') + "/Mimic_" + hash + Mimic.RANDOM.nextInt(10000, 99999), template, mirror))
+        return (new InlineMimicGenerator(name.replace('.', '/') + "/Mimic_" + count(), template, mirror))
             .createInline();
     }
+    
+    static synchronized int count() {
+        return counter++;
+    }
+    //endregion
     
     <Template, Thing> Template makeIntrinsicProxy(Mirror<Thing> mirror, Class<Template> template) {
         int hash = Objects.hash(template);
@@ -491,38 +509,23 @@ class LookingGlass implements ClassProvider {
         } else {
             name = InlineMimicGenerator.getStrictPackageName(template);
         }
-        return (new IntrinsicMimicGenerator(name.replace('.', '/') + "/Mimic_" + hash + Mimic.RANDOM.nextInt(10000, 99999), template, mirror))
+        return (new IntrinsicMimicGenerator(name.replace('.', '/') + "/Mimic_" + count(), template, mirror))
             .createInline();
-    }
-    //endregion
-    
-    //region Boilerplate
-    static boolean isReachable(Object thing) {
-        if (thing instanceof Class<?> object)
-            return Modifier.isPublic(object.getModifiers()) && LookingGlass.class.getModule()
-                .canRead(object.getModule());
-        else if (thing instanceof Method object)
-            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
-        else if (thing instanceof Field object)
-            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
-        else if (thing instanceof Constructor object)
-            return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
-        else return isReachable(thing.getClass());
     }
     
     boolean verify() {
         return true;
     }
     
-    ClassProvider getProvider() {
-        return provider;
-    }
-    //endregion
-    
     public Class<?> getTargetPreference(Class<?> target, Object handle) {
         if (LookingGlass.isReachable(target) && LookingGlass.isReachable(handle))
             return LookingGlass.class;
         return target;
+    }
+    //endregion
+    
+    protected Class<?> loadClass(String name, byte[] bytes) {
+        return this.loadClass(LookingGlass.class, name, bytes);
     }
     
     //region Class Loaders
@@ -532,8 +535,8 @@ class LookingGlass implements ClassProvider {
         else return getProvider().loadClass(target, name, bytes);
     }
     
-    protected Class<?> loadClass(String name, byte[] bytes) {
-        return this.loadClass(LookingGlass.class, name, bytes);
+    ClassProvider getProvider() {
+        return provider;
     }
     //endregion
     
@@ -745,68 +748,6 @@ class LookingGlass implements ClassProvider {
         return namespace;
     }
     
-    interface Handles {
-        
-        static Handle getBootstrap(final Constructor<?> constructor) {
-            try {
-                if (Modifier.isPrivate(constructor.getModifiers())) {
-                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateDynamicConstructor", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                } else {
-                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapDynamicConstructor", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                }
-            } catch (Throwable ex) {
-                throw new RuntimeException(ex);
-            }
-        }
-        
-        static Handle getBootstrap(final Method method) {
-            try {
-                if (Modifier.isPrivate(method.getModifiers())) {
-                    if (Modifier.isStatic(method.getModifiers()))
-                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivate", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateDynamic", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                } else {
-                    if (Modifier.isStatic(method.getModifiers()))
-                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrap", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapDynamic", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                }
-            } catch (Throwable ex) {
-                throw new RuntimeException(ex);
-            }
-        }
-        
-        static Handle getBootstrap(final Field field, final boolean setter) {
-            final boolean dynamic = !Modifier.isStatic(field.getModifiers());
-            try {
-                if (setter) {
-                    if (dynamic)
-                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateFieldSetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateStaticFieldSetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                } else {
-                    if (dynamic)
-                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateFieldGetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateStaticFieldGetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
-                }
-            } catch (Throwable ex) {
-                throw new RuntimeException(ex);
-            }
-        }
-        
-        static Handle getHandle(final Method method) {
-            final int code;
-            if (Modifier.isStatic(method.getModifiers())) code = H_INVOKESTATIC;
-            else if (Modifier.isAbstract(method.getModifiers())) code = H_INVOKEINTERFACE;
-            else if (Modifier.isPrivate(method.getModifiers())) code = H_INVOKESPECIAL;
-            else code = H_INVOKEVIRTUAL;
-            return new Handle(code, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), code == H_INVOKEINTERFACE);
-        }
-        
-        static Handle createHandle(String owner, String name, String descriptor) {
-            return new Handle(H_INVOKESTATIC, owner, name, descriptor, false);
-        }
-        
-    }
-    
     //region Utilities
     protected void writeMethodCall(MethodVisitor visitor, Object target, Class<?> owner, String name, String descriptor) {
         visitor.visitMethodInsn(182, Type.getInternalName(owner), name, descriptor, false);
@@ -898,6 +839,68 @@ class LookingGlass implements ClassProvider {
         } else {
             return type == Void.TYPE ? 6 : 5;
         }
+    }
+    
+    interface Handles {
+        
+        static Handle getBootstrap(final Constructor<?> constructor) {
+            try {
+                if (Modifier.isPrivate(constructor.getModifiers())) {
+                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateDynamicConstructor", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                } else {
+                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapDynamicConstructor", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                }
+            } catch (Throwable ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        
+        static Handle getHandle(final Method method) {
+            final int code;
+            if (Modifier.isStatic(method.getModifiers())) code = H_INVOKESTATIC;
+            else if (Modifier.isAbstract(method.getModifiers())) code = H_INVOKEINTERFACE;
+            else if (Modifier.isPrivate(method.getModifiers())) code = H_INVOKESPECIAL;
+            else code = H_INVOKEVIRTUAL;
+            return new Handle(code, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), code == H_INVOKEINTERFACE);
+        }
+        
+        static Handle getBootstrap(final Method method) {
+            try {
+                if (Modifier.isPrivate(method.getModifiers())) {
+                    if (Modifier.isStatic(method.getModifiers()))
+                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivate", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateDynamic", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                } else {
+                    if (Modifier.isStatic(method.getModifiers()))
+                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrap", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapDynamic", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                }
+            } catch (Throwable ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        
+        static Handle getBootstrap(final Field field, final boolean setter) {
+            final boolean dynamic = !Modifier.isStatic(field.getModifiers());
+            try {
+                if (setter) {
+                    if (dynamic)
+                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateFieldSetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateStaticFieldSetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                } else {
+                    if (dynamic)
+                        return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateFieldGetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                    return Handles.getHandle(Bootstrap.class.getMethod("bootstrapPrivateStaticFieldGetter", MethodHandles.Lookup.class, String.class, MethodType.class, Class.class));
+                }
+            } catch (Throwable ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        
+        static Handle createHandle(String owner, String name, String descriptor) {
+            return new Handle(H_INVOKESTATIC, owner, name, descriptor, false);
+        }
+        
     }
     //endregion
     

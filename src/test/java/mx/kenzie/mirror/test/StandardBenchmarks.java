@@ -13,72 +13,8 @@ import java.lang.reflect.Method;
 
 public class StandardBenchmarks {
     
-    static int tries = 100000;
     static final TestMirror READER = new TestMirror(Object.class);
-    
-    public static class TestMirror extends Mirror<Object> {
-        public TestMirror(Object target) {
-            super(target);
-        }
-        
-        @Override
-        public byte[] retrieveCode(Accessor object) {
-            return super.retrieveCode(object);
-        }
-    }
-    
-    public static class Thing {
-        
-        public int a = 1;
-        @SuppressWarnings("all")
-        private int b = 2;
-        public static int c = 3;
-        @SuppressWarnings("all")
-        private static int d = 4;
-        
-        public int a() {
-            return 1;
-        }
-        
-        private int b() {
-            return 2;
-        }
-        
-        public static int c() {
-            return 3;
-        }
-        
-        private static int d() {
-            return 4;
-        }
-        
-    }
-    
-    public interface Intrinsic {
-        int $a();
-        
-        void $a(int i);
-        
-        int $b();
-        
-        void $b(int i);
-        
-        int $c();
-        
-        void $c(int i);
-        
-        int $d();
-        
-        void $d(int i);
-        
-        int a();
-        
-        int b();
-        
-        int c();
-        
-        int d();
-    }
+    static int tries = 100000;
     
     public static void main(String[] args) throws Throwable {
         new StandardBenchmarks().speedTest();
@@ -419,7 +355,6 @@ public class StandardBenchmarks {
         System.out.println("The winner was: " + (reflect > handles && mirror > handles ? "Handles" : mirror > reflect ? "Reflection" : "Mirror"));
         return (reflect > handles && mirror > handles ? 2 : mirror > reflect ? 1 : 3);
     }
-    //endregion
     
     //region Field Setters
     public static int fieldSetPublicDynamic() throws Throwable {
@@ -668,6 +603,7 @@ public class StandardBenchmarks {
         System.out.println("The winner was: " + (reflect > handles && mirror > handles ? "Handles" : mirror > reflect ? "Reflection" : "Mirror"));
         return (reflect > handles && mirror > handles ? 2 : mirror > reflect ? 1 : 3);
     }
+    //endregion
     
     public static int fieldSetPrivateStatic() throws Throwable {
         System.out.println();
@@ -743,7 +679,6 @@ public class StandardBenchmarks {
         System.out.println("The winner was: " + (reflect > handles && mirror > handles ? "Handles" : mirror > reflect ? "Reflection" : "Mirror"));
         return (reflect > handles && mirror > handles ? 2 : mirror > reflect ? 1 : 3);
     }
-    //endregion
     
     //region Method Invokers
     public static int methodPublicDynamic() throws Throwable {
@@ -964,6 +899,7 @@ public class StandardBenchmarks {
         System.out.println("The winner was: " + (reflect > handles && mirror > handles ? "Handles" : mirror > reflect ? "Reflection" : "Mirror"));
         return (reflect > handles && mirror > handles ? 2 : mirror > reflect ? 1 : 3);
     }
+    //endregion
     
     public static int methodPrivateStatic() throws Throwable {
         System.out.println();
@@ -1036,6 +972,70 @@ public class StandardBenchmarks {
         System.out.println("Java MethodHandles took: " + handles + " nanos.");
         System.out.println("The winner was: " + (reflect > handles && mirror > handles ? "Handles" : mirror > reflect ? "Reflection" : "Mirror"));
         return (reflect > handles && mirror > handles ? 2 : mirror > reflect ? 1 : 3);
+    }
+    
+    public interface Intrinsic {
+        int $a();
+        
+        void $a(int i);
+        
+        int $b();
+        
+        void $b(int i);
+        
+        int $c();
+        
+        void $c(int i);
+        
+        int $d();
+        
+        void $d(int i);
+        
+        int a();
+        
+        int b();
+        
+        int c();
+        
+        int d();
+    }
+    
+    public static class TestMirror extends Mirror<Object> {
+        public TestMirror(Object target) {
+            super(target);
+        }
+        
+        @Override
+        public byte[] retrieveCode(Accessor object) {
+            return super.retrieveCode(object);
+        }
+    }
+    
+    public static class Thing {
+        
+        public static int c = 3;
+        @SuppressWarnings("all")
+        private static int d = 4;
+        public int a = 1;
+        @SuppressWarnings("all")
+        private int b = 2;
+        
+        public static int c() {
+            return 3;
+        }
+        
+        private static int d() {
+            return 4;
+        }
+        
+        public int a() {
+            return 1;
+        }
+        
+        private int b() {
+            return 2;
+        }
+        
     }
     //endregion
     

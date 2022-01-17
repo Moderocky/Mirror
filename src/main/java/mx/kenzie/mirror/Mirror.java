@@ -26,20 +26,6 @@ public class Mirror<Thing> {
         this.loader = Mirror.class.getClassLoader();
     }
     
-    public Mirror<Thing> useProvider(ClassProvider provider) {
-        this.glass = new LookingGlass(provider);
-        return this;
-    }
-    
-    public Mirror<Thing> setLoader(ClassLoader loader) {
-        this.loader = loader;
-        return this;
-    }
-    
-    public ClassLoader getLoader() {
-        return loader;
-    }
-    
     /**
      * Mirror a class for accessing static members.
      *
@@ -49,6 +35,20 @@ public class Mirror<Thing> {
      */
     public static <Target> Mirror<Class<Target>> of(Class<Target> type) {
         return new Mirror<>(type);
+    }
+    
+    public Mirror<Thing> useProvider(ClassProvider provider) {
+        this.glass = new LookingGlass(provider);
+        return this;
+    }
+    
+    public ClassLoader getLoader() {
+        return loader;
+    }
+    
+    public Mirror<Thing> setLoader(ClassLoader loader) {
+        this.loader = loader;
+        return this;
     }
     
     /**
@@ -66,6 +66,17 @@ public class Mirror<Thing> {
     }
     
     /**
+     * Mirror an object for accessing dynamic members.
+     *
+     * @param thing    the object to mirror
+     * @param <Target> the object-type
+     * @return the mirror
+     */
+    public static <Target> Mirror<Target> of(Target thing) {
+        return new Mirror<>(thing);
+    }
+    
+    /**
      * Creates an intrinsic 'magic' mirror that follows the methods of the provided class.
      * Using an interface here is recommended, but allows any class type.
      * This will invoke the methods on the target object directly rather than using an accessor.
@@ -78,17 +89,6 @@ public class Mirror<Thing> {
         if (Modifier.isFinal(template.getModifiers()))
             throw new IllegalArgumentException("Template must not be final.");
         return glass.makeIntrinsicProxy(Mirror.of(target), template);
-    }
-    
-    /**
-     * Mirror an object for accessing dynamic members.
-     *
-     * @param thing    the object to mirror
-     * @param <Target> the object-type
-     * @return the mirror
-     */
-    public static <Target> Mirror<Target> of(Target thing) {
-        return new Mirror<>(thing);
     }
     
     /**

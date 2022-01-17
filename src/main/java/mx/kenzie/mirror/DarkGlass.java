@@ -47,44 +47,12 @@ final class DarkGlass extends LookingGlass {
         return this.make(type, target);
     }
     
-    @Override
-    protected void writeInvoker(ClassWriter writer, Method method, String location, Class<?> targetType) {
-        final MethodVisitor visitor;
-        final Type methodType = Type.getMethodType(Type.getType(Object.class), Type.getType(Object[].class));
-        final Class<?>[] parameters = method.getParameterTypes();
-        visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE, "invoke", methodType.getDescriptor(), null, null);
-        visitor.visitCode();
-        if (!Modifier.isStatic(method.getModifiers())) {
-            visitor.visitVarInsn(ALOAD, 0);
-            visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
-            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType)); // CC is okay here, always right
+    private Method getInvoker(Object dark) {
+        try {
+            return dark.getClass().getDeclaredMethod("invoke", Object[].class);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalArgumentException("Provided object is not a dark invoker.", e);
         }
-        if (verify()) {
-            visitor.visitVarInsn(ALOAD, 0);
-            visitor.visitVarInsn(ALOAD, 1);
-            visitor.visitIntInsn(BIPUSH, parameters.length);
-            visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(MethodAccessor.MethodAccessorImpl.class), "verifyArray", "([Ljava/lang/Object;I)V", false);
-        }
-        parameters:
-        {
-            if (parameters.length == 0) break parameters;
-            if (parameters[0] == Object[].class) {
-                visitor.visitVarInsn(ALOAD, 1); // pass array directly since it's a bridge
-                break parameters;
-            }
-            for (int i = 0; i < parameters.length; i++) {
-                this.convertParameter(visitor, parameters[i], i);
-            }
-        }
-        if (isReachable(method)) this.invokeNormal(visitor, method);
-        else this.invokeDynamic(visitor, method);
-        if (method.getReturnType().isPrimitive())
-            this.box(visitor, method.getReturnType());
-        visitor.visitInsn(ARETURN);
-        final int offset = this.wideIndexOffset(method.getParameterTypes(), method.getReturnType());
-        final int size = Math.max(1 + parameters.length + offset, 4);
-        visitor.visitMaxs(size, size);
-        visitor.visitEnd();
     }
     
     private byte[] writeDarkMethodAccessor(Class<?> targetType, Method method, String location) {
@@ -144,12 +112,44 @@ final class DarkGlass extends LookingGlass {
         return writer.toByteArray();
     }
     
-    private Method getInvoker(Object dark) {
-        try {
-            return dark.getClass().getDeclaredMethod("invoke", Object[].class);
-        } catch (NoSuchMethodException e) {
-            throw new IllegalArgumentException("Provided object is not a dark invoker.", e);
+    @Override
+    protected void writeInvoker(ClassWriter writer, Method method, String location, Class<?> targetType) {
+        final MethodVisitor visitor;
+        final Type methodType = Type.getMethodType(Type.getType(Object.class), Type.getType(Object[].class));
+        final Class<?>[] parameters = method.getParameterTypes();
+        visitor = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE, "invoke", methodType.getDescriptor(), null, null);
+        visitor.visitCode();
+        if (!Modifier.isStatic(method.getModifiers())) {
+            visitor.visitVarInsn(ALOAD, 0);
+            visitor.visitFieldInsn(GETFIELD, location, "target", "Ljava/lang/Object;");
+            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(targetType)); // CC is okay here, always right
         }
+        if (verify()) {
+            visitor.visitVarInsn(ALOAD, 0);
+            visitor.visitVarInsn(ALOAD, 1);
+            visitor.visitIntInsn(BIPUSH, parameters.length);
+            visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(MethodAccessor.MethodAccessorImpl.class), "verifyArray", "([Ljava/lang/Object;I)V", false);
+        }
+        parameters:
+        {
+            if (parameters.length == 0) break parameters;
+            if (parameters[0] == Object[].class) {
+                visitor.visitVarInsn(ALOAD, 1); // pass array directly since it's a bridge
+                break parameters;
+            }
+            for (int i = 0; i < parameters.length; i++) {
+                this.convertParameter(visitor, parameters[i], i);
+            }
+        }
+        if (isReachable(method)) this.invokeNormal(visitor, method);
+        else this.invokeDynamic(visitor, method);
+        if (method.getReturnType().isPrimitive())
+            this.box(visitor, method.getReturnType());
+        visitor.visitInsn(ARETURN);
+        final int offset = this.wideIndexOffset(method.getParameterTypes(), method.getReturnType());
+        final int size = Math.max(1 + parameters.length + offset, 4);
+        visitor.visitMaxs(size, size);
+        visitor.visitEnd();
     }
     //endregion
     
@@ -178,6 +178,22 @@ final class DarkGlass extends LookingGlass {
             type = provider.loadClass(point, path + ".Field_" + hash, bytecode);
         }
         return this.make(type, target);
+    }
+    
+    private Method getFieldGetter(Object dark) {
+        try {
+            return dark.getClass().getDeclaredMethod("get");
+        } catch (NoSuchMethodException e) {
+            throw new IllegalArgumentException("Provided object is not a dark field accessor.", e);
+        }
+    }
+    
+    private Method getFieldSetter(Object dark) {
+        try {
+            return dark.getClass().getDeclaredMethod("set", Object.class);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalArgumentException("Provided object is not a dark field accessor.", e);
+        }
     }
     
     private byte[] writeDarkFieldAccessor(Class<?> targetType, Field field, String location) {
@@ -243,22 +259,6 @@ final class DarkGlass extends LookingGlass {
             visitor.visitEnd();
         }
         return writer.toByteArray();
-    }
-    
-    private Method getFieldGetter(Object dark) {
-        try {
-            return dark.getClass().getDeclaredMethod("get");
-        } catch (NoSuchMethodException e) {
-            throw new IllegalArgumentException("Provided object is not a dark field accessor.", e);
-        }
-    }
-    
-    private Method getFieldSetter(Object dark) {
-        try {
-            return dark.getClass().getDeclaredMethod("set", Object.class);
-        } catch (NoSuchMethodException e) {
-            throw new IllegalArgumentException("Provided object is not a dark field accessor.", e);
-        }
     }
     //endregion
     

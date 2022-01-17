@@ -9,14 +9,14 @@ import java.io.Serializable;
 
 public class InternalAccessTest {
     
+    @SuppressWarnings("all")
+    private static int b = 5;
+    @SuppressWarnings("all")
+    private int a = 3;
+
     private int number() {
         return 2;
     }
-    
-    @SuppressWarnings("all")
-    private int a = 3;
-    @SuppressWarnings("all")
-    private static int b = 5;
     
     @Test
     public void accessJavaInternals() throws Throwable {

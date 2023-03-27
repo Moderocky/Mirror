@@ -13,15 +13,15 @@ import java.util.List;
 import static org.objectweb.asm.Opcodes.*;
 
 class InlineMimicGenerator extends MimicGenerator {
-    
+
     protected final Mirror<?> mirror;
     protected List<MethodAccessor<?>> accessors = new ArrayList<>();
-    
+
     protected InlineMimicGenerator(String location, Class<?> top, Mirror<?> mirror) {
         super(location, top);
         this.mirror = mirror;
     }
-    
+
     static String getStrictPackageName(Class<?> top, Class<?>... interfaces) {
         String namespace = "com.sun.proxy.mimic"; // Proxies get special treatment for going here so need to use this
         if (top != null && !Modifier.isPublic(top.getModifiers())) {
@@ -34,7 +34,7 @@ class InlineMimicGenerator extends MimicGenerator {
         }
         return namespace;
     }
-    
+
     public <Template> Template createInline() {
         final boolean complex = !top.isInterface();
         final byte[] bytecode = writeCode();
@@ -51,11 +51,10 @@ class InlineMimicGenerator extends MimicGenerator {
         }
         return (Template) object;
     }
-    
+
     @Override
     protected byte[] writeCode() {
         writer.visit(61, 1 | 16 | 32, internal, null, Type.getInternalName(top != null && !top.isInterface() ? top : Object.class), this.getInterfaces());
-        method_accessors:
         {
             final FieldVisitor visitor = writer.visitField(0, "methods", "[Lmx/kenzie/mirror/MethodAccessor;", null, null);
             visitor.visitEnd();
@@ -68,7 +67,7 @@ class InlineMimicGenerator extends MimicGenerator {
         writer.visitEnd();
         return writer.toByteArray();
     }
-    
+
     @Override
     protected void writeCaller(Method method) {
         final MethodAccessor<?> accessor = mirror.method(method.getName(), method.getParameterTypes());

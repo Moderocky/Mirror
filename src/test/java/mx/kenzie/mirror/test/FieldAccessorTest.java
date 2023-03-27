@@ -6,12 +6,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class FieldAccessorTest {
-    
+
     public static int b;
     private static int d;
     public int a;
     private int c;
-    
+
     @BeforeClass
     public static void warmUp() {
         final Mirror<?> mirror = Mirror.of(new FieldAccessorTest());
@@ -20,7 +20,7 @@ public class FieldAccessorTest {
         mirror.field("c").get();
         mirror.field("d").get();
     }
-    
+
     @Test
     public void publicDynamic() {
         final FieldAccessor<?> accessor = Mirror.of(this).field("a");
@@ -30,7 +30,7 @@ public class FieldAccessorTest {
         accessor.set(3);
         assert (int) accessor.get() == 3;
     }
-    
+
     @Test
     public void publicStatic() {
         final FieldAccessor<?> accessor = Mirror.of(this).field("b");
@@ -46,7 +46,7 @@ public class FieldAccessorTest {
             ex.getCause().printStackTrace();
         }
     }
-    
+
     @Test
     public void privateDynamic() {
         final FieldAccessor<?> accessor = Mirror.of(this).field("c");
@@ -56,7 +56,7 @@ public class FieldAccessorTest {
         accessor.set(14);
         assert (int) accessor.get() == 14;
     }
-    
+
     @Test
     public void privateStatic() {
         final FieldAccessor<?> accessor = Mirror.of(this).field("d");
@@ -66,5 +66,5 @@ public class FieldAccessorTest {
         accessor.set(22);
         assert (int) accessor.get() == 22;
     }
-    
+
 }

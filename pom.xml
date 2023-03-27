@@ -6,7 +6,7 @@
 
     <groupId>mx.kenzie</groupId>
     <artifactId>mirror</artifactId>
-    <version>5.0.4</version>
+    <version>5.0.5</version>
     <name>Mirror</name>
 
     <properties>

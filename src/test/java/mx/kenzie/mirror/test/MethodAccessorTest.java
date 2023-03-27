@@ -6,15 +6,15 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class MethodAccessorTest {
-    
+
     private static int foo(int i) {
         return i + 1;
     }
-    
+
     public static int foo(int i, int j) {
         return i + j;
     }
-    
+
     @BeforeClass
     public static void warmUp() {
         final Mirror<?> mirror = Mirror.of(new MethodAccessorTest());
@@ -23,19 +23,19 @@ public class MethodAccessorTest {
         mirror.method("bar", int.class).invoke(0);
         mirror.method("bar", int.class, int.class).invoke(0, 0);
     }
-    
+
     private int bar(int i) {
         return i + 2;
     }
-    
+
     public int bar(int i, int j) {
         return i + j;
     }
-    
+
     private int test() {
         return 1;
     }
-    
+
     @Test
     public void privateDynamic() {
         final MethodAccessor<?> accessor = Mirror.of(this).method("bar", int.class);
@@ -44,7 +44,7 @@ public class MethodAccessorTest {
         assert accessor.isDynamicAccess();
         assert (int) accessor.invoke(2) == 4;
     }
-    
+
     @Test
     public void privateStatic() {
         final MethodAccessor<?> accessor = Mirror.of(MethodAccessorTest.class).method("foo", int.class);
@@ -53,7 +53,7 @@ public class MethodAccessorTest {
         assert accessor.isDynamicAccess();
         assert (int) accessor.invoke(2) == 3;
     }
-    
+
     @Test
     public void publicDynamic() {
         final MethodAccessor<?> accessor = Mirror.of(this).method("bar", int.class, int.class);
@@ -62,7 +62,7 @@ public class MethodAccessorTest {
         assert !accessor.isDynamicAccess();
         assert (int) accessor.invoke(2, 6) == 8;
     }
-    
+
     @Test
     public void publicStatic() {
         final MethodAccessor<?> accessor = Mirror.of(this).method("foo", int.class, int.class);
@@ -71,11 +71,11 @@ public class MethodAccessorTest {
         assert !accessor.isDynamicAccess();
         assert (int) accessor.invoke(2, 3) == 5;
     }
-    
+
     @Test
     public void noArgs() {
         final MethodAccessor<Integer> accessor = Mirror.of(this).method("test");
         assert accessor.invoke() == 1;
     }
-    
+
 }

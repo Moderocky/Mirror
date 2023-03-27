@@ -13,18 +13,18 @@ import java.lang.reflect.Modifier;
 import static org.objectweb.asm.Opcodes.*;
 
 class IntrinsicMimicGenerator extends MimicGenerator {
-    
+
     protected final Mirror<?> mirror;
     private boolean hasStaticMethodBootstrap;
     private boolean hasDynamicMethodBootstrap;
     private boolean hasStaticFieldBootstrap;
     private boolean hasDynamicFieldBootstrap;
-    
+
     protected IntrinsicMimicGenerator(String location, Class<?> top, Mirror<?> mirror) {
         super(location, top);
         this.mirror = mirror;
     }
-    
+
     public <Template> Template createInline() {
         final boolean complex = !top.isInterface();
         final byte[] bytecode = writeCode();
@@ -46,11 +46,10 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         }
         return (Template) object;
     }
-    
+
     @Override
     protected byte[] writeCode() {
         writer.visit(61, 1 | 16 | 32, internal, null, Type.getInternalName(top != null && !top.isInterface() ? top : Object.class), this.getInterfaces());
-        target:
         {
             final FieldVisitor visitor = writer.visitField(ACC_PUBLIC, "target", mirror.emergentClass()
                 .descriptorString(), null, null);
@@ -64,7 +63,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         writer.visitEnd();
         return writer.toByteArray();
     }
-    
+
     @Override
     protected void writeCaller(Method method) {
         final Method target = mirror.findMethod(method.getName(), method.getParameterTypes());
@@ -101,7 +100,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         visitor.visitMaxs(size, size);
         visitor.visitEnd();
     }
-    
+
     protected void writeFieldCaller(Method method) {
         final String name = method.getName().substring(1);
         final Field target = mirror.findField(name);
@@ -137,7 +136,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         visitor.visitMaxs(size, size);
         visitor.visitEnd();
     }
-    
+
     private void writeBootstrapper(ClassWriter writer, Method method) {
         final boolean dynamic = !Modifier.isStatic(method.getModifiers());
         if (dynamic && hasDynamicMethodBootstrap) return;
@@ -146,7 +145,7 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         else hasStaticMethodBootstrap = true;
         mirror.glass.writeBootstrapper(writer, method);
     }
-    
+
     private void writeBootstrapper(ClassWriter writer, Field field) {
         final boolean dynamic = !Modifier.isStatic(field.getModifiers());
         if (dynamic && hasDynamicFieldBootstrap) return;
@@ -155,5 +154,5 @@ class IntrinsicMimicGenerator extends MimicGenerator {
         else hasStaticFieldBootstrap = true;
         mirror.glass.writeBootstrapper(writer, field);
     }
-    
+
 }

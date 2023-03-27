@@ -8,7 +8,7 @@ import org.junit.Test;
 import java.io.Serializable;
 
 public class InternalAccessTest {
-    
+
     @SuppressWarnings("all")
     private static int b = 5;
     @SuppressWarnings("all")
@@ -17,7 +17,7 @@ public class InternalAccessTest {
     private int number() {
         return 2;
     }
-    
+
     @Test
     public void accessJavaInternals() throws Throwable {
         final Class<?> secrets = Class.forName("jdk.internal.access.SharedSecrets", false, ClassLoader.getSystemClassLoader());
@@ -27,7 +27,7 @@ public class InternalAccessTest {
         final Object jla = accessor.invoke();
         assert jla != null;
     }
-    
+
     @Test
     public void accessPrivateField() {
         {
@@ -37,7 +37,7 @@ public class InternalAccessTest {
             final Class<?>[] interfaces = accessor.invoke();
             assert interfaces[0] == Serializable.class;
         }
-        
+
         { // check duplication doesn't occur
             final MethodAccessor<Class<?>[]> accessor = Mirror.of(Class.class)
                 .unsafe()
@@ -45,9 +45,9 @@ public class InternalAccessTest {
             final Class<?>[] interfaces = accessor.invoke();
             assert interfaces[0] == Serializable.class;
         }
-        
+
     }
-    
+
     @Test
     public void accessUnnamed() {
         final MethodAccessor<Integer> accessor = Mirror.of(this)
@@ -55,7 +55,7 @@ public class InternalAccessTest {
             .method("number");
         assert accessor.invoke() == 2;
     }
-    
+
     @Test
     public void accessUnnamedDynamicField() {
         final FieldAccessor<Integer> accessor = Mirror.of(this)
@@ -64,7 +64,7 @@ public class InternalAccessTest {
         accessor.set(6);
         assert accessor.get() == 6;
     }
-    
+
     @Test
     public void accessUnnamedStaticField() {
         final FieldAccessor<Integer> accessor = Mirror.of(this)
@@ -73,7 +73,7 @@ public class InternalAccessTest {
         accessor.set(6);
         assert accessor.get() == 6;
     }
-    
+
     @Test
     public void accessNamedStaticField() {
         final FieldAccessor<Integer> accessor = Mirror.of(Class.class)
@@ -81,5 +81,5 @@ public class InternalAccessTest {
             .field("SYNTHETIC");
         assert accessor.get() == 0x00001000;
     }
-    
+
 }

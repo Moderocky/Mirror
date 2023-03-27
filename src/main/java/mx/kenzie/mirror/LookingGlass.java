@@ -22,7 +22,7 @@ class LookingGlass implements ClassProvider {
     protected Map<String, Class<?>> cache = new HashMap<>();
     protected RuntimeClassLoader loader = new RuntimeClassLoader();
     protected ClassProvider provider;
-    
+
     public LookingGlass() {
         try {
             provider = new InternalAccessProvider();
@@ -30,12 +30,12 @@ class LookingGlass implements ClassProvider {
             provider = this;
         }
     }
-    
+
     public LookingGlass(ClassProvider provider) {
         if (provider != null) this.provider = provider;
         else this.provider = this;
     }
-    
+
     //region Boilerplate
     static boolean isReachable(Object thing) {
         if (thing instanceof Class<?> object)
@@ -49,13 +49,18 @@ class LookingGlass implements ClassProvider {
             return Modifier.isPublic(object.getModifiers()) && isReachable(object.getDeclaringClass());
         else return isReachable(thing.getClass());
     }
-    
+
+    static synchronized int count() {
+        return counter++;
+    }
+    //endregion
+
     //region Constructor Accessor Generation
     <Thing>
     ConstructorAccessor<Thing> createAccessor(Class<?> target, Constructor<?> constructor) {
         if (constructor == null) return null;
-        final String hash = "" + constructor.getName()
-            .hashCode() + Objects.hash((Object[]) constructor.getParameterTypes());
+        final String hash = String.valueOf(constructor.getName()
+            .hashCode()) + Objects.hash((Object[]) constructor.getParameterTypes());
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
         else create:{
@@ -73,8 +78,7 @@ class LookingGlass implements ClassProvider {
         accessor.dynamic = !isReachable(constructor);
         return accessor;
     }
-    //endregion
-    
+
     byte[] writeConstructorAccessor(Class<?> targetType, Constructor<?> constructor, String location) {
         final ClassWriter writer = new ClassWriter(0);
         writer.visit(V17, ACC_PUBLIC | ACC_SUPER, location, null, Type.getInternalName(ConstructorAccessor.ConstructorAccessorImpl.class), new String[]{Type.getInternalName(MethodAccessor.class)});
@@ -122,7 +126,7 @@ class LookingGlass implements ClassProvider {
         }
         return writer.toByteArray();
     }
-    
+
     Constructor<?> findConstructor(Class<?> target, Class<?>... parameters) {
         try {
             return target.getDeclaredConstructor(parameters);
@@ -130,14 +134,14 @@ class LookingGlass implements ClassProvider {
             return null;
         }
     }
-    
+
     //region Method Accessor Generation
     <
         Thing,
         Return>
     MethodAccessor<Return> createAccessor(Thing target, Method method) {
         if (method == null) return null;
-        final String hash = "" + method.getDeclaringClass().hashCode() + "_" + method.getName()
+        final String hash = method.getDeclaringClass().hashCode() + "_" + method.getName()
             .hashCode() + Objects.hash((Object[]) method.getParameterTypes());
         final Class<?> point = target instanceof Class c ? c : target.getClass();
         final Class<?> type;
@@ -157,7 +161,7 @@ class LookingGlass implements ClassProvider {
         accessor.dynamic = !isReachable(method);
         return accessor;
     }
-    
+
     byte[] writeMethodAccessor(Class<?> targetType, Method method, String location) {
         final ClassWriter writer = new ClassWriter(0);
         writer.visit(V17, ACC_PUBLIC | ACC_SUPER, location, null, Type.getInternalName(MethodAccessor.MethodAccessorImpl.class), new String[]{Type.getInternalName(MethodAccessor.class)});
@@ -177,7 +181,7 @@ class LookingGlass implements ClassProvider {
         this.writeInvoker(writer, method, location, targetType);
         return writer.toByteArray();
     }
-    
+
     protected void writeInvoker(ClassWriter writer, Method method, String location, Class<?> targetType) {
         final MethodVisitor visitor;
         final Type methodType = Type.getMethodType(Type.getType(Object.class), Type.getType(Object[].class));
@@ -212,7 +216,7 @@ class LookingGlass implements ClassProvider {
         visitor.visitMaxs(size, size);
         visitor.visitEnd();
     }
-    
+
     void convertParameter(MethodVisitor visitor, Class<?> parameter, int index) {
         visitor.visitVarInsn(ALOAD, 1);
         visitor.visitIntInsn(BIPUSH, index);
@@ -221,7 +225,7 @@ class LookingGlass implements ClassProvider {
         if (parameter.isPrimitive())
             unbox(visitor, parameter);
     }
-    
+
     void invokeNormal(MethodVisitor visitor, Method method) {
         if (Modifier.isInterface(method.getDeclaringClass().getModifiers())) {
             visitor.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), true);
@@ -231,11 +235,11 @@ class LookingGlass implements ClassProvider {
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), false);
         }
     }
-    
+
     private void invokeSpecial(MethodVisitor visitor, Constructor<?> constructor) {
         visitor.visitMethodInsn(INVOKESPECIAL, Type.getInternalName(constructor.getDeclaringClass()), "<init>", Type.getConstructorDescriptor(constructor), false);
     }
-    
+
     private void invokeDynamic(MethodVisitor visitor, Constructor<?> constructor) {
         final Handle bootstrap = Handles.getBootstrap(constructor);
         final List<Type> adjusted = new ArrayList<>();
@@ -244,7 +248,8 @@ class LookingGlass implements ClassProvider {
         }
         visitor.visitInvokeDynamicInsn("constructor", Type.getMethodDescriptor(Type.getType(constructor.getDeclaringClass()), adjusted.toArray(new Type[0])), bootstrap, Type.getType(constructor.getDeclaringClass()));
     }
-    
+    //endregion
+
     void invokeDynamic(MethodVisitor visitor, Method method) {
         final Handle bootstrap = Handles.getBootstrap(method);
         if (!Modifier.isStatic(method.getModifiers())) {
@@ -258,8 +263,7 @@ class LookingGlass implements ClassProvider {
             visitor.visitInvokeDynamicInsn(method.getName(), Type.getMethodDescriptor(method), bootstrap, Type.getType(method.getDeclaringClass()));
         }
     }
-    //endregion
-    
+
     Method findSmartMethod(Class<?> target, String name, Object... arguments) {
         final int length = arguments.length;
         final Class<?>[] args = new Class[arguments.length];
@@ -288,7 +292,7 @@ class LookingGlass implements ClassProvider {
         }
         return findSmartMethod(target.getSuperclass(), name, arguments);
     }
-    
+
     Method findMethod(Class<?> target, String name, Class<?>... parameters) {
         try {
             return target.getDeclaredMethod(name, parameters);
@@ -299,7 +303,7 @@ class LookingGlass implements ClassProvider {
             return null;
         }
     }
-    
+
     void invokeDynamic(MethodVisitor visitor, Method method, String owner) {
         final boolean dynamic = !Modifier.isStatic(method.getModifiers());
         final Handle bootstrap = Handles.createHandle(owner, "bootstrapInvoke" + (dynamic ? "" : "Static"), Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
@@ -314,25 +318,27 @@ class LookingGlass implements ClassProvider {
             visitor.visitInvokeDynamicInsn(method.getName(), Type.getMethodDescriptor(method), bootstrap, Type.getType(method.getDeclaringClass()));
         }
     }
-    
+
     //region Field Accessor Generation
     <
         Thing,
         Type>
     FieldAccessor<Type> createAccessor(Thing target, Field field) {
         if (field == null) return null;
-        final String hash = "" + field.getDeclaringClass().hashCode() + "_" + field.getName()
-            .hashCode() + field.getType().hashCode();
+        final String hash = Math.abs(field.getDeclaringClass().hashCode()) + "_" + Math.abs(field.getName()
+            .hashCode() + field.getType().hashCode());
         final Class<?> type;
         if (cache.containsKey(hash)) type = cache.get(hash);
         else create:{
             final Class<?> point = target instanceof Class c ? c : target.getClass();
             final String path = this.getExportedPackageFrom(point);
-            final String location = path.replace('.', '/') + "/Field_" + hash;
+            final String location;
+            if (path == null || path.isBlank() || path.equals(".")) location = "Field_" + hash;
+            else location = path.replace('.', '/') + "/Field_" + hash;
             final byte[] bytecode = this.writeFieldAccessor(point, field, location);
             if (this.provider instanceof InternalAccessProvider provider)
                 provider.assureAvailable(FieldAccessor.FieldAccessorImpl.class, point);
-            type = this.loadClass(this.getTargetPreference(point, field), path + ".Field_" + hash, bytecode);
+            type = this.loadClass(this.getTargetPreference(point, field), location.replace('/', '.'), bytecode);
             cache.put(hash, type);
         }
         final FieldAccessor.FieldAccessorImpl<Thing, Type> accessor = this.make(type, target);
@@ -342,7 +348,7 @@ class LookingGlass implements ClassProvider {
         accessor.type = (Class<Type>) field.getType();
         return accessor;
     }
-    
+
     byte[] writeFieldAccessor(Class<?> targetType, Field field, String location) {
         final ClassWriter writer = new ClassWriter(0);
         writer.visit(V17, ACC_PUBLIC | ACC_SUPER, location, null, Type.getInternalName(FieldAccessor.FieldAccessorImpl.class), new String[]{Type.getInternalName(FieldAccessor.class)});
@@ -403,7 +409,7 @@ class LookingGlass implements ClassProvider {
         }
         return writer.toByteArray();
     }
-    
+
     void setNormal(MethodVisitor visitor, Field field) {
         if (Modifier.isStatic(field.getModifiers())) {
             visitor.visitFieldInsn(PUTSTATIC, Type.getInternalName(field.getDeclaringClass()), field.getName(), Type.getDescriptor(field.getType()));
@@ -411,7 +417,7 @@ class LookingGlass implements ClassProvider {
             visitor.visitFieldInsn(PUTFIELD, Type.getInternalName(field.getDeclaringClass()), field.getName(), Type.getDescriptor(field.getType()));
         }
     }
-    
+
     void setDynamic(MethodVisitor visitor, Field field) {
         final Handle bootstrap = Handles.getBootstrap(field, true);
         final Type[] types;
@@ -419,7 +425,8 @@ class LookingGlass implements ClassProvider {
         else types = new Type[]{Type.getType(field.getDeclaringClass()), Type.getType(field.getType())};
         visitor.visitInvokeDynamicInsn(field.getName(), Type.getMethodDescriptor(Type.getType(void.class), types), bootstrap, Type.getType(field.getDeclaringClass()));
     }
-    
+    //endregion
+
     void getNormal(MethodVisitor visitor, Field field) {
         if (Modifier.isStatic(field.getModifiers())) {
             visitor.visitFieldInsn(GETSTATIC, Type.getInternalName(field.getDeclaringClass()), field.getName(), Type.getDescriptor(field.getType()));
@@ -427,8 +434,7 @@ class LookingGlass implements ClassProvider {
             visitor.visitFieldInsn(GETFIELD, Type.getInternalName(field.getDeclaringClass()), field.getName(), Type.getDescriptor(field.getType()));
         }
     }
-    //endregion
-    
+
     void getDynamic(MethodVisitor visitor, Field field) {
         final Handle bootstrap = Handles.getBootstrap(field, false);
         final String descriptor;
@@ -438,7 +444,7 @@ class LookingGlass implements ClassProvider {
             descriptor = Type.getMethodDescriptor(Type.getType(field.getType()), Type.getType(field.getDeclaringClass()));
         visitor.visitInvokeDynamicInsn(field.getName(), descriptor, bootstrap, Type.getType(field.getDeclaringClass()));
     }
-    
+
     Field findField(Class<?> target, String name) {
         try {
             return target.getDeclaredField(name);
@@ -449,7 +455,7 @@ class LookingGlass implements ClassProvider {
             return null;
         }
     }
-    
+
     void getDynamic(MethodVisitor visitor, Field field, String owner) {
         final boolean dynamic = !Modifier.isStatic(field.getModifiers());
         final Handle bootstrap = Handles.createHandle(owner, "bootstrapGetter" + (dynamic ? "" : "Static"), Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
@@ -460,7 +466,7 @@ class LookingGlass implements ClassProvider {
             descriptor = Type.getMethodDescriptor(Type.getType(field.getType()), Type.getType(field.getDeclaringClass()));
         visitor.visitInvokeDynamicInsn(field.getName(), descriptor, bootstrap, Type.getType(field.getDeclaringClass()));
     }
-    
+
     void setDynamic(MethodVisitor visitor, Field field, String owner) {
         final boolean dynamic = !Modifier.isStatic(field.getModifiers());
         final Handle bootstrap = Handles.createHandle(owner, "bootstrapSetter" + (dynamic ? "" : "Static"), Type.getMethodDescriptor(Type.getType(CallSite.class), Type.getType(MethodHandles.Lookup.class), Type.getType(String.class), Type.getType(MethodType.class), Type.getType(Class.class)));
@@ -469,7 +475,7 @@ class LookingGlass implements ClassProvider {
         else types = new Type[]{Type.getType(field.getDeclaringClass()), Type.getType(field.getType())};
         visitor.visitInvokeDynamicInsn(field.getName(), Type.getMethodDescriptor(Type.getType(void.class), types), bootstrap, Type.getType(field.getDeclaringClass()));
     }
-    
+
     //region Creators
     <Template> Template make(Class<?> type, Object target) {
         final Object object = InternalAccessProvider.make(type, target);
@@ -481,7 +487,7 @@ class LookingGlass implements ClassProvider {
 //            throw new IllegalStateException("An impossible state has been met during frame creation.", e);
 //        }
     }
-    
+
     <Template, Thing> Template makeInlineProxy(Mirror<Thing> mirror, Class<Template> template) {
         int hash = Objects.hash(template);
         final String name;
@@ -494,12 +500,8 @@ class LookingGlass implements ClassProvider {
         return (new InlineMimicGenerator(name.replace('.', '/') + "/Mimic_" + count(), template, mirror))
             .createInline();
     }
-    
-    static synchronized int count() {
-        return counter++;
-    }
     //endregion
-    
+
     <Template, Thing> Template makeIntrinsicProxy(Mirror<Thing> mirror, Class<Template> template) {
         int hash = Objects.hash(template);
         final String name;
@@ -512,34 +514,34 @@ class LookingGlass implements ClassProvider {
         return (new IntrinsicMimicGenerator(name.replace('.', '/') + "/Mimic_" + count(), template, mirror))
             .createInline();
     }
-    
+
     boolean verify() {
         return true;
     }
-    
+
     public Class<?> getTargetPreference(Class<?> target, Object handle) {
         if (LookingGlass.isReachable(target) && LookingGlass.isReachable(handle))
             return LookingGlass.class;
         return target;
     }
     //endregion
-    
+
     protected Class<?> loadClass(String name, byte[] bytes) {
         return this.loadClass(LookingGlass.class, name, bytes);
     }
-    
+
     //region Class Loaders
     @Override
     public Class<?> loadClass(Class<?> target, String name, byte[] bytes) {
         if (getProvider() == this) return loader.loadClass(name, bytes);
         else return getProvider().loadClass(target, name, bytes);
     }
-    
+
     ClassProvider getProvider() {
         return provider;
     }
     //endregion
-    
+
     //region Boxing
     Class<?> getWrapperType(Class<?> primitive) {
         if (primitive == byte.class) return Byte.class;
@@ -552,7 +554,7 @@ class LookingGlass implements ClassProvider {
         if (primitive == void.class) return Void.class;
         return primitive;
     }
-    
+
     void unbox(MethodVisitor visitor, Class<?> parameter) {
         if (parameter == byte.class)
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(Byte.class), "byteValue", "()B", false);
@@ -569,7 +571,7 @@ class LookingGlass implements ClassProvider {
         if (parameter == boolean.class)
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(Boolean.class), "booleanValue", "()Z", false);
     }
-    
+
     void box(MethodVisitor visitor, Class<?> value) {
         if (value == byte.class)
             visitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Byte.class), "valueOf", "(B)Ljava/lang/Byte;", false);
@@ -589,7 +591,7 @@ class LookingGlass implements ClassProvider {
             visitor.visitInsn(ACONST_NULL);
     }
     //endregion
-    
+
     //region Bootstrap Methods
     protected void writeBootstrapper(ClassWriter writer, Field field) {
         if (Modifier.isStatic(field.getModifiers())) {
@@ -690,7 +692,7 @@ class LookingGlass implements ClassProvider {
             }
         }
     }
-    
+
     protected void writeBootstrapper(ClassWriter writer, Method method) {
         final boolean dynamic = !Modifier.isStatic(method.getModifiers());
         final MethodVisitor visitor;
@@ -737,7 +739,7 @@ class LookingGlass implements ClassProvider {
         visitor.visitEnd();
     }
     //endregion
-    
+
     protected String getExportedPackageFrom(Class<?> place) {
         final Module module = place.getModule();
         final String namespace;
@@ -747,12 +749,12 @@ class LookingGlass implements ClassProvider {
             provider.export(module, namespace);
         return namespace;
     }
-    
+
     //region Utilities
     protected void writeMethodCall(MethodVisitor visitor, Object target, Class<?> owner, String name, String descriptor) {
         visitor.visitMethodInsn(182, Type.getInternalName(owner), name, descriptor, false);
     }
-    
+
     private void doTypeConversion(MethodVisitor visitor, Class<?> from, Class<?> to) {
         if (from != to) {
             if (from != Void.TYPE && to != Void.TYPE) {
@@ -795,38 +797,38 @@ class LookingGlass implements ClassProvider {
                     } else {
                         opcode = 133;
                     }
-                    
+
                     visitor.visitInsn(opcode);
                 } else {
                     if (from.isPrimitive() ^ to.isPrimitive()) {
                         String var10002 = from.getSimpleName();
                         throw new IllegalArgumentException("Type wrapping is currently unsupported due to side-effects: '" + var10002 + "' -> '" + to.getSimpleName() + "'");
                     }
-                    
+
                     visitor.visitTypeInsn(192, Type.getInternalName(to));
                 }
-                
+
             }
         }
     }
-    
+
     protected int wideIndexOffset(Class<?>[] params, Class<?> ret) {
         int i = 0;
         Class[] var4 = params;
         int var5 = params.length;
-        
+
         for (int var6 = 0; var6 < var5; ++var6) {
             Class<?> param = var4[var6];
             i += this.wideIndexOffset(param);
         }
-        
+
         return Math.max(i, this.wideIndexOffset(ret));
     }
-    
+
     protected int wideIndexOffset(Class<?> thing) {
         return thing != Long.TYPE && thing != Double.TYPE ? 0 : 1;
     }
-    
+
     private int instructionOffset(Class<?> type) {
         if (type == Integer.TYPE) {
             return 1;
@@ -840,9 +842,9 @@ class LookingGlass implements ClassProvider {
             return type == Void.TYPE ? 6 : 5;
         }
     }
-    
+
     interface Handles {
-        
+
         static Handle getBootstrap(final Constructor<?> constructor) {
             try {
                 if (Modifier.isPrivate(constructor.getModifiers())) {
@@ -854,7 +856,7 @@ class LookingGlass implements ClassProvider {
                 throw new RuntimeException(ex);
             }
         }
-        
+
         static Handle getHandle(final Method method) {
             final int code;
             if (Modifier.isStatic(method.getModifiers())) code = H_INVOKESTATIC;
@@ -863,7 +865,7 @@ class LookingGlass implements ClassProvider {
             else code = H_INVOKEVIRTUAL;
             return new Handle(code, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), code == H_INVOKEINTERFACE);
         }
-        
+
         static Handle getBootstrap(final Method method) {
             try {
                 if (Modifier.isPrivate(method.getModifiers())) {
@@ -879,7 +881,7 @@ class LookingGlass implements ClassProvider {
                 throw new RuntimeException(ex);
             }
         }
-        
+
         static Handle getBootstrap(final Field field, final boolean setter) {
             final boolean dynamic = !Modifier.isStatic(field.getModifiers());
             try {
@@ -896,29 +898,29 @@ class LookingGlass implements ClassProvider {
                 throw new RuntimeException(ex);
             }
         }
-        
+
         static Handle createHandle(String owner, String name, String descriptor) {
             return new Handle(H_INVOKESTATIC, owner, name, descriptor, false);
         }
-        
+
     }
     //endregion
-    
+
     static class RuntimeClassLoader extends ClassLoader {
         public RuntimeClassLoader(String name, ClassLoader parent) {
             super(name, parent);
         }
-        
+
         public RuntimeClassLoader(ClassLoader parent) {
             super(parent);
         }
-        
+
         public RuntimeClassLoader() {
         }
-        
+
         public Class<?> loadClass(String name, byte[] bytecode) {
             return this.defineClass(name, bytecode, 0, bytecode.length);
         }
     }
-    
+
 }

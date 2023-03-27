@@ -13,17 +13,18 @@ import static org.objectweb.asm.Opcodes.*;
 
 @SuppressWarnings({"unchecked", "Duplicates", "UnusedLabel", "TypeParameterHidesVisibleType"})
 final class DarkGlass extends LookingGlass {
-    
+
     final InternalAccessProvider provider;
-    
+
     {
         try {
             provider = new InternalAccessProvider();
-        } catch (ClassNotFoundException | PrivilegedActionException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+        } catch (ClassNotFoundException | PrivilegedActionException | NoSuchFieldException | NoSuchMethodException |
+                 InvocationTargetException | IllegalAccessException e) {
             throw new RuntimeException("Unable to access JDK internals:", e);
         }
     }
-    
+
     //region Method Accessors
     @Override
     <Thing, Return> MethodAccessor<Return> createAccessor(Thing target, Method method) {
@@ -31,7 +32,7 @@ final class DarkGlass extends LookingGlass {
         final Method invoker = this.getInvoker(dark);
         return super.createAccessor(dark, invoker);
     }
-    
+
     private Object createDarkAccessor(Object target, Method method) {
         if (method == null) throw new NullPointerException("No matching method was found.");
         final String hash = "D" + method.getDeclaringClass().hashCode() + "_" + method.getName()
@@ -46,7 +47,7 @@ final class DarkGlass extends LookingGlass {
         }
         return this.make(type, target);
     }
-    
+
     private Method getInvoker(Object dark) {
         try {
             return dark.getClass().getDeclaredMethod("invoke", Object[].class);
@@ -54,7 +55,7 @@ final class DarkGlass extends LookingGlass {
             throw new IllegalArgumentException("Provided object is not a dark invoker.", e);
         }
     }
-    
+
     private byte[] writeDarkMethodAccessor(Class<?> targetType, Method method, String location) {
         final ClassWriter writer = new ClassWriter(0);
         writer.visit(V17, ACC_PUBLIC | ACC_SUPER, location, null, "java/lang/Object", new String[0]);
@@ -111,7 +112,7 @@ final class DarkGlass extends LookingGlass {
         }
         return writer.toByteArray();
     }
-    
+
     @Override
     protected void writeInvoker(ClassWriter writer, Method method, String location, Class<?> targetType) {
         final MethodVisitor visitor;
@@ -152,7 +153,7 @@ final class DarkGlass extends LookingGlass {
         visitor.visitEnd();
     }
     //endregion
-    
+
     //region Field Accessors
     @Override
     <
@@ -164,7 +165,7 @@ final class DarkGlass extends LookingGlass {
         final Method setter = this.getFieldSetter(dark);
         return new FieldAccessor.RelayedFieldAccessor<>(super.createAccessor(dark, getter), super.createAccessor(dark, setter));
     }
-    
+
     private Object createDarkAccessor(Object target, Field field) {
         if (field == null) throw new NullPointerException("No matching field was found.");
         final String hash = "D" + field.getDeclaringClass().hashCode() + "_" + field.getName()
@@ -179,7 +180,7 @@ final class DarkGlass extends LookingGlass {
         }
         return this.make(type, target);
     }
-    
+
     private Method getFieldGetter(Object dark) {
         try {
             return dark.getClass().getDeclaredMethod("get");
@@ -187,7 +188,7 @@ final class DarkGlass extends LookingGlass {
             throw new IllegalArgumentException("Provided object is not a dark field accessor.", e);
         }
     }
-    
+
     private Method getFieldSetter(Object dark) {
         try {
             return dark.getClass().getDeclaredMethod("set", Object.class);
@@ -195,7 +196,7 @@ final class DarkGlass extends LookingGlass {
             throw new IllegalArgumentException("Provided object is not a dark field accessor.", e);
         }
     }
-    
+
     private byte[] writeDarkFieldAccessor(Class<?> targetType, Field field, String location) {
         final ClassWriter writer = new ClassWriter(0);
         writer.visit(V17, ACC_PUBLIC | ACC_SUPER, location, null, "java/lang/Object", new String[0]);
@@ -261,7 +262,7 @@ final class DarkGlass extends LookingGlass {
         return writer.toByteArray();
     }
     //endregion
-    
+
     @Override
     <Template> Template make(Class<?> type, Object target) {
         try {
@@ -271,10 +272,10 @@ final class DarkGlass extends LookingGlass {
             throw new IllegalStateException("An impossible state has been met during frame creation.", e);
         }
     }
-    
+
     @Override
     boolean verify() {
         return false;
     }
-    
+
 }

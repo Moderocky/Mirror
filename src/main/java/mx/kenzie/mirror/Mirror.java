@@ -13,19 +13,19 @@ import java.lang.reflect.Modifier;
  * @param <Thing> the type of the mirrored object
  */
 public class Mirror<Thing> {
-    
+
     protected static final LookingGlass GLASS = new LookingGlass();
-    
+
     protected final Thing target;
     protected LookingGlass glass;
     protected ClassLoader loader;
-    
+
     protected Mirror(Thing target) {
         this.target = target;
         this.glass = GLASS;
         this.loader = Mirror.class.getClassLoader();
     }
-    
+
     /**
      * Mirror a class for accessing static members.
      *
@@ -36,21 +36,32 @@ public class Mirror<Thing> {
     public static <Target> Mirror<Class<Target>> of(Class<Target> type) {
         return new Mirror<>(type);
     }
-    
+
+    /**
+     * Mirror an object for accessing dynamic members.
+     *
+     * @param thing    the object to mirror
+     * @param <Target> the object-type
+     * @return the mirror
+     */
+    public static <Target> Mirror<Target> of(Target thing) {
+        return new Mirror<>(thing);
+    }
+
     public Mirror<Thing> useProvider(ClassProvider provider) {
         this.glass = new LookingGlass(provider);
         return this;
     }
-    
+
     public ClassLoader getLoader() {
         return loader;
     }
-    
+
     public Mirror<Thing> setLoader(ClassLoader loader) {
         this.loader = loader;
         return this;
     }
-    
+
     /**
      * Creates a 'magic' mirror that follows the methods of the provided class.
      * Using an interface here is recommended, but allows any class type.
@@ -64,18 +75,7 @@ public class Mirror<Thing> {
             throw new IllegalArgumentException("Template must not be final.");
         return glass.makeInlineProxy(Mirror.of(target), template);
     }
-    
-    /**
-     * Mirror an object for accessing dynamic members.
-     *
-     * @param thing    the object to mirror
-     * @param <Target> the object-type
-     * @return the mirror
-     */
-    public static <Target> Mirror<Target> of(Target thing) {
-        return new Mirror<>(thing);
-    }
-    
+
     /**
      * Creates an intrinsic 'magic' mirror that follows the methods of the provided class.
      * Using an interface here is recommended, but allows any class type.
@@ -90,7 +90,7 @@ public class Mirror<Thing> {
             throw new IllegalArgumentException("Template must not be final.");
         return glass.makeIntrinsicProxy(Mirror.of(target), template);
     }
-    
+
     /**
      * Obtain a constructor accessor.
      *
@@ -103,7 +103,7 @@ public class Mirror<Thing> {
             return glass.createAccessor(type, glass.findConstructor(type, parameters));
         return glass.createAccessor(target.getClass(), glass.findConstructor(target.getClass(), parameters));
     }
-    
+
     /**
      * Obtain a constructor accessor from a constructor object.
      *
@@ -114,7 +114,7 @@ public class Mirror<Thing> {
     public <Type> ConstructorAccessor<Type> constructor(Constructor<Type> constructor) {
         return glass.createAccessor(target.getClass(), constructor);
     }
-    
+
     /**
      * Obtain a method accessor.
      *
@@ -128,7 +128,7 @@ public class Mirror<Thing> {
             return glass.createAccessor(target, glass.findMethod(type, name, parameters));
         return glass.createAccessor(target, glass.findMethod(target.getClass(), name, parameters));
     }
-    
+
     /**
      * Obtain a method accessor.
      *
@@ -142,7 +142,7 @@ public class Mirror<Thing> {
             return glass.createAccessor(target, glass.findSmartMethod(type, name, arguments));
         return glass.createAccessor(target, glass.findSmartMethod(target.getClass(), name, arguments));
     }
-    
+
     /**
      * Obtain a method accessor from a method object.
      *
@@ -153,7 +153,7 @@ public class Mirror<Thing> {
     public <Return> MethodAccessor<Return> method(Method method) {
         return glass.createAccessor(target, method);
     }
-    
+
     /**
      * Obtain a field accessor.
      *
@@ -166,7 +166,7 @@ public class Mirror<Thing> {
             return glass.createAccessor(target, glass.findField(type, name));
         return glass.createAccessor(target, glass.findField(target.getClass(), name));
     }
-    
+
     /**
      * Obtain a field accessor from a field object.
      *
@@ -177,37 +177,37 @@ public class Mirror<Thing> {
     public <Type> FieldAccessor<Type> field(Field field) {
         return glass.createAccessor(target, field);
     }
-    
+
     public Mirror<Thing> unsafe() {
         this.glass = new DarkGlass();
         return this;
     }
-    
+
     Field findField(String name) {
         if (target instanceof Class<?> type)
             return glass.findField(type, name);
         return glass.findField(target.getClass(), name);
     }
-    
+
     Method findMethod(String name, Class<?>... parameters) {
         if (target instanceof Class<?> type)
             return glass.findMethod(type, name, parameters);
         return glass.findMethod(target.getClass(), name, parameters);
     }
-    
+
     Class<?> emergentClass() {
         if (target instanceof Class<?> type) return type;
         return target.getClass();
     }
-    
+
     protected Class<?> loadClass(String name, byte[] bytecode) {
         return glass.loadClass(name, bytecode);
     }
-    
+
     protected Class<?> loadClass(Class<?> target, String name, byte[] bytecode) {
         return glass.loadClass(target, name, bytecode);
     }
-    
+
     @TestOnly
     protected byte[] retrieveCode(final Accessor object) {
         if (object instanceof FieldAccessor<?> accessor)
@@ -221,5 +221,5 @@ public class Mirror<Thing> {
                 .getName().replace('.', '/'));
         return new byte[0];
     }
-    
+
 }

@@ -10,7 +10,7 @@ import java.security.*;
 
 @SuppressWarnings({"removal", "deprecated", "unchecked", "Duplicates", "TypeParameterHidesVisibleType"})
 class InternalAccessProvider implements ClassProvider {
-    
+
     final Object javaLangAccess;
     final Unsafe unsafe;
     final Method defineClass;
@@ -18,7 +18,7 @@ class InternalAccessProvider implements ClassProvider {
     final Method addExports0;
     final Method addExportsToAllUnnamed0;
     final Method newInstanceWithCaller;
-    
+
     InternalAccessProvider() throws ClassNotFoundException, PrivilegedActionException, NoSuchFieldException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         final Class<?> secrets = Class.forName("jdk.internal.access.SharedSecrets", false, ClassLoader.getSystemClassLoader());
         unsafe = AccessController.doPrivileged((PrivilegedExceptionAction<Unsafe>) () -> {
@@ -48,7 +48,7 @@ class InternalAccessProvider implements ClassProvider {
         newInstanceWithCaller = Constructor.class.getDeclaredMethod("newInstanceWithCaller", Object[].class, boolean.class, Class.class);
         setAccessible0.invoke(newInstanceWithCaller, true);
     }
-    
+
     public static Object make(Class<?> type, Object target) {
         try {
             final Constructor<?> constructor = type.getConstructor(Object.class);
@@ -58,7 +58,7 @@ class InternalAccessProvider implements ClassProvider {
             return null;
         }
     }
-    
+
     Class<?> findClass(Class<?> target, String name) {
         final ClassLoader loader = this.getClassLoader(target.getModule());
         try {
@@ -67,12 +67,12 @@ class InternalAccessProvider implements ClassProvider {
             return null;
         }
     }
-    
+
     ClassLoader getClassLoader(Module target) {
         PrivilegedAction<ClassLoader> pa = target::getClassLoader;
         return AccessController.doPrivileged(pa);
     }
-    
+
     @Override
     public Class<?> loadClass(Class<?> target, String name, byte[] bytes) {
         try {
@@ -88,7 +88,7 @@ class InternalAccessProvider implements ClassProvider {
             throw new RuntimeException("Unable to load class.", e);
         }
     }
-    
+
     void assureAvailable(Class<?> resource, Class<?> target) {
         if (resource == null) return;
         for (final Class<?> template : resource.getInterfaces()) {
@@ -109,7 +109,7 @@ class InternalAccessProvider implements ClassProvider {
             this.loadClass(target, resource.getName(), bytecode);
         }
     }
-    
+
     byte[] getSource(final String type) {
         try (final InputStream stream = ClassLoader.getSystemResourceAsStream(type + ".class")) {
             if (stream == null) return new byte[0];
@@ -118,7 +118,7 @@ class InternalAccessProvider implements ClassProvider {
             return new byte[0];
         }
     }
-    
+
     void addReads(final Module reader, final Module target) {
         try {
             addReads0.invoke(null, reader, target);
@@ -126,7 +126,7 @@ class InternalAccessProvider implements ClassProvider {
             reader.addReads(target);
         }
     }
-    
+
     void export(final Module module, final String namespace) {
         try {
             addExports0.invoke(null, module, namespace, LookingGlass.class.getModule());
@@ -135,7 +135,7 @@ class InternalAccessProvider implements ClassProvider {
             module.addExports(namespace, LookingGlass.class.getModule());
         }
     }
-    
+
     <Type> Type newInstance(Constructor<Type> constructor, Object... parameters) {
         try {
             return (Type) this.newInstanceWithCaller.invoke(constructor, parameters, false, constructor.getDeclaringClass());

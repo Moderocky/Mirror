@@ -227,10 +227,10 @@ class LookingGlass implements ClassProvider {
     }
 
     void invokeNormal(MethodVisitor visitor, Method method) {
-        if (Modifier.isInterface(method.getDeclaringClass().getModifiers())) {
-            visitor.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), true);
-        } else if (Modifier.isStatic(method.getModifiers())) {
+        if (Modifier.isStatic(method.getModifiers())) {
             visitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), false);
+        } else if (Modifier.isInterface(method.getDeclaringClass().getModifiers())) {
+            visitor.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), true);
         } else {
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), false);
         }

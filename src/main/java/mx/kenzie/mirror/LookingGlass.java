@@ -58,7 +58,7 @@ class LookingGlass implements ClassProvider {
     //region Constructor Accessor Generation
     <Thing>
     ConstructorAccessor<Thing> createAccessor(Class<?> target, Constructor<?> constructor) {
-        if (constructor == null) return null;
+        if (target == null || constructor == null) return null;
         final String hash = String.valueOf(constructor.getName()
             .hashCode()) + Objects.hash((Object[]) constructor.getParameterTypes());
         final Class<?> type;
@@ -140,7 +140,7 @@ class LookingGlass implements ClassProvider {
         Thing,
         Return>
     MethodAccessor<Return> createAccessor(Thing target, Method method) {
-        if (method == null) return null;
+        if (target == null || method == null) return null;
         final String hash = method.getDeclaringClass().hashCode() + "_" + method.getName()
             .hashCode() + Objects.hash((Object[]) method.getParameterTypes());
         final Class<?> point = target instanceof Class c ? c : target.getClass();
@@ -227,9 +227,10 @@ class LookingGlass implements ClassProvider {
     }
 
     void invokeNormal(MethodVisitor visitor, Method method) {
+        final boolean isInterface = Modifier.isInterface(method.getDeclaringClass().getModifiers());
         if (Modifier.isStatic(method.getModifiers())) {
-            visitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), false);
-        } else if (Modifier.isInterface(method.getDeclaringClass().getModifiers())) {
+            visitor.visitMethodInsn(INVOKESTATIC, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), isInterface);
+        } else if (isInterface) {
             visitor.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), true);
         } else {
             visitor.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(method.getDeclaringClass()), method.getName(), Type.getMethodDescriptor(method), false);
@@ -265,6 +266,7 @@ class LookingGlass implements ClassProvider {
     }
 
     Method findSmartMethod(Class<?> target, String name, Object... arguments) {
+        if (target == null) return null;
         final int length = arguments.length;
         final Class<?>[] args = new Class[arguments.length];
         for (int i = 0; i < arguments.length; i++) {
@@ -273,7 +275,7 @@ class LookingGlass implements ClassProvider {
         for (final Method method : target.getDeclaredMethods()) {
             if (method.getParameterCount() != length) continue;
             if (!method.getName().equals(name)) continue;
-            if (!Arrays.equals(args, method.getParameterTypes())) return method;
+            if (Arrays.equals(args, method.getParameterTypes())) return method;
         }
         for (final Method method : target.getDeclaredMethods())
             check_params:{
@@ -294,6 +296,7 @@ class LookingGlass implements ClassProvider {
     }
 
     Method findMethod(Class<?> target, String name, Class<?>... parameters) {
+        if (target == null) return null;
         try {
             return target.getDeclaredMethod(name, parameters);
         } catch (NoSuchMethodException ex) {
@@ -324,7 +327,7 @@ class LookingGlass implements ClassProvider {
         Thing,
         Type>
     FieldAccessor<Type> createAccessor(Thing target, Field field) {
-        if (field == null) return null;
+        if (target == null || field == null) return null;
         final String hash = Math.abs(field.getDeclaringClass().hashCode()) + "_" + Math.abs(field.getName()
             .hashCode() + field.getType().hashCode());
         final Class<?> type;
@@ -446,6 +449,7 @@ class LookingGlass implements ClassProvider {
     }
 
     Field findField(Class<?> target, String name) {
+        if (target == null) return null;
         try {
             return target.getDeclaredField(name);
         } catch (NoSuchFieldException ex) {
